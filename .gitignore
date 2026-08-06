@@ -1,0 +1,12 @@
+# Home Assistant runtime and generated data
+homeassistant/home-assistant_v2.db*
+homeassistant/*.log
+homeassistant/.storage/*
+!homeassistant/.storage/lovelace
+!homeassistant/.storage/lovelace_dashboards
+
+# Never commit credentials by accident
+homeassistant/secrets.yaml
+
+# Add-on runtime data
+ha_config_sync/data/

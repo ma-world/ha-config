@@ -1,0 +1,32 @@
+name: HA Config Sync
+version: "1.0.0"
+slug: ha_config_sync
+description: Copies selected Home Assistant configuration to Git and pushes it.
+url: https://github.com/ma-world/ha-config
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+startup: application
+boot: manual
+init: false
+map:
+  - config:rw
+options:
+  repository_url: https://github.com/ma-world/ha-config.git
+  branch: main
+  git_name: Home Assistant Config Sync
+  git_email: home-assistant@local
+  github_token: ""
+  include_secrets: false
+  include_dashboards: true
+schema:
+  repository_url: str
+  branch: str
+  git_name: str
+  git_email: email
+  github_token: password
+  include_secrets: bool
+  include_dashboards: bool
