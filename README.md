@@ -1,26 +1,31 @@
 # Home Assistant Configuration Sync
 
-Dieses Repository ist ein **öffentliches lokales Home-Assistant-Add-on-Repository**. Die Konfigurations-Snapshots werden getrennt und standardmäßig in das private Repository `ma-world/homeassistant-config-files` geschrieben. Die Ausführung findet vollständig in Home Assistant statt:
+This is a **public Home Assistant add-on repository**. The add-on copies selected files from `/config`, creates a Git commit when changes are detected, and pushes the snapshot to the Git repository you configure. Everything runs inside Home Assistant.
 
-1. Das Add-on startet beim Start von Home Assistant automatisch.
-2. Es synchronisiert sofort nach dem Start und danach im in der Add-on-Konfiguration festgelegten Intervall (standardmäßig alle vier Stunden).
-3. Es liest `/config`, übernimmt nur ausgewählte Konfigurationsdateien in den Ordner `homeassistant/`, erstellt bei Änderungen einen Commit und pusht ihn nach `main`.
+1. The add-on starts automatically when Home Assistant starts.
+2. It runs one sync immediately, then repeats at the interval configured in the add-on settings (four hours by default).
+3. It stores the selected configuration files under `homeassistant/` in the configured Git repository and pushes changes to the configured branch.
 
-## Einmalig einrichten
+## Initial setup
 
-1. Das Add-on-Repository `ma-world/ha-config` ist öffentlich verfügbar.
-2. In Home Assistant unter **Einstellungen → Add-ons → Add-on-Shop → Repositories** `https://github.com/ma-world/ha-config` hinzufügen.
-3. Das Add-on **HA Config Sync** installieren.
-4. In der Add-on-Konfiguration einen GitHub Fine-grained Personal Access Token eintragen. Er benötigt für dieses Repository mindestens **Contents: Read and write**. Der Token wird ausschließlich in der Add-on-Konfiguration gespeichert und niemals in das Git-Repository geschrieben.
-5. In der Add-on-Konfiguration **`sync_interval_hours`** auf das gewünschte Intervall setzen (zulässig: 1 bis 168 Stunden; Standard: 4).
-6. Das Add-on starten. Es führt sofort einen ersten Lauf durch und bleibt anschließend aktiv, um nach jedem konfigurierten Intervall erneut zu sichern.
+1. Add this repository in Home Assistant under **Settings → Add-ons → Add-on Store → Repositories**.
+2. Install the **HA Config Sync** add-on.
+3. In the add-on configuration, set `repository_url` to your private Git repository, for example:
 
-## Gesicherte Inhalte
+   ```text
+   https://github.com/<YOUR USER NAME>/homeassistant-config-files.git
+   ```
 
-Standardmäßig werden unter `homeassistant/` gesichert: `configuration.yaml`, Automationen, Skripte, Szenen, Packages, Blueprints, Themes, `custom_components`, ESPHome-, Zigbee2MQTT- und WWW-Dateien sowie optional die Lovelace-Dashboarddefinitionen.
+4. Create a GitHub fine-grained personal access token with **Contents: Read and write** access to that backup repository, then enter it as `github_token` in the add-on configuration. The token is stored only in the add-on configuration and is never committed to Git.
+5. Set `sync_interval_hours` to the desired interval. The allowed range is 1 to 168 hours; the default is 4.
+6. Start the add-on. It performs an initial sync immediately and remains active for subsequent scheduled syncs.
 
-Nicht gesichert werden Laufzeitdaten, Datenbanken, Logs, Authentifizierungsdaten, Tokens und `secrets.yaml`. Das verhindert, dass Zugangsdaten versehentlich nach GitHub gelangen. `secrets.yaml` kann in den Add-on-Optionen bewusst aktiviert werden – empfohlen ist dafür ausschließlich ein privates Repository.
+## Included files
 
-## Intervall ändern
+By default, the add-on stores `configuration.yaml`, automations, scripts, scenes, packages, blueprints, themes, `custom_components`, ESPHome, Zigbee2MQTT, and WWW files. Lovelace dashboard definitions can also be included.
 
-Öffne das Add-on **HA Config Sync**, ändere `sync_interval_hours` und speichere die Konfiguration. Starte das Add-on anschließend neu, damit das neue Intervall gilt. Details zu jedem Lauf stehen im Add-on-Protokoll.
+Runtime data, databases, logs, authentication data, tokens, and `secrets.yaml` are excluded by default. This reduces the risk of committing credentials to Git. You can explicitly enable `secrets.yaml` in the add-on options; use a private backup repository if you do.
+
+## Changing the interval
+
+Open the **HA Config Sync** add-on, update `sync_interval_hours`, save the configuration, and restart the add-on for the new interval to take effect. The add-on log shows the result of each sync.
