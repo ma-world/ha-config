@@ -15,7 +15,7 @@ init: false
 map:
   - config:rw
 options:
-  repository_url: https://github.com/ma-world/ha-config.git
+  repository_url: https://github.com/ma-world/homeassistant-config-files.git
   branch: main
   git_name: Home Assistant Config Sync
   git_email: home-assistant@local
