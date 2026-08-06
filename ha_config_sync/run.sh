@@ -13,9 +13,15 @@ git_email="$(bashio::config 'git_email')"
 github_token="$(bashio::config 'github_token')"
 include_secrets="$(bashio::config 'include_secrets')"
 include_dashboards="$(bashio::config 'include_dashboards')"
+sync_interval_hours="$(bashio::config 'sync_interval_hours')"
 
 if [[ -z "${repository_url}" ]]; then
   bashio::log.fatal 'repository_url must be configured.'
+  exit 1
+fi
+
+if ! [[ "${sync_interval_hours}" =~ ^[1-9][0-9]*$ ]] || (( sync_interval_hours > 168 )); then
+  bashio::log.fatal 'sync_interval_hours must be a whole number between 1 and 168.'
   exit 1
 fi
 
@@ -47,32 +53,6 @@ ASKPASS
   export GITHUB_TOKEN="${github_token}"
 fi
 
-mkdir -p "${WORK_DIR}"
-if [[ ! -d "${WORK_DIR}/.git" ]]; then
-  bashio::log.info 'Initializing local repository clone.'
-  git -C "${WORK_DIR}" init --initial-branch="${branch}"
-  git -C "${WORK_DIR}" remote add origin "${repository_url}"
-else
-  git -C "${WORK_DIR}" remote set-url origin "${repository_url}"
-fi
-
-git -C "${WORK_DIR}" config user.name "${git_name}"
-git -C "${WORK_DIR}" config user.email "${git_email}"
-
-# Incorporate commits made outside Home Assistant before creating a new snapshot.
-if git -C "${WORK_DIR}" fetch --prune origin "${branch}"; then
-  if git -C "${WORK_DIR}" show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
-    if git -C "${WORK_DIR}" rev-parse --verify --quiet HEAD >/dev/null; then
-      git -C "${WORK_DIR}" rebase "origin/${branch}"
-    else
-      git -C "${WORK_DIR}" checkout -B "${branch}" "origin/${branch}"
-    fi
-  fi
-else
-  bashio::log.warning 'Remote branch could not be fetched; continuing with the local checkout.'
-fi
-
-mkdir -p "${SNAPSHOT_DIR}"
 copy_path() {
   local relative_path="$1"
   local source_path="${CONFIG_DIR}/${relative_path}"
@@ -90,44 +70,71 @@ copy_path() {
   fi
 }
 
-# Configuration needed to recreate Home Assistant, excluding runtime databases and credentials.
-paths=(
-  automations.yaml
-  blueprints
-  configuration.yaml
-  customize.yaml
-  custom_components
-  esphome
-  groups.yaml
-  packages
-  scenes.yaml
-  scripts.yaml
-  themes
-  www
-  zigbee2mqtt
-)
+sync_configuration() {
+  mkdir -p "${WORK_DIR}"
+  if [[ ! -d "${WORK_DIR}/.git" ]]; then
+    bashio::log.info 'Initializing local repository clone.'
+    git -C "${WORK_DIR}" init --initial-branch="${branch}"
+    git -C "${WORK_DIR}" remote add origin "${repository_url}"
+  else
+    git -C "${WORK_DIR}" remote set-url origin "${repository_url}"
+  fi
 
-for path in "${paths[@]}"; do
-  copy_path "${path}"
+  git -C "${WORK_DIR}" config user.name "${git_name}"
+  git -C "${WORK_DIR}" config user.email "${git_email}"
+
+  # Incorporate commits made outside Home Assistant before creating a new snapshot.
+  if git -C "${WORK_DIR}" fetch --prune origin "${branch}"; then
+    if git -C "${WORK_DIR}" show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+      if git -C "${WORK_DIR}" rev-parse --verify --quiet HEAD >/dev/null; then
+        git -C "${WORK_DIR}" rebase "origin/${branch}"
+      else
+        git -C "${WORK_DIR}" checkout -B "${branch}" "origin/${branch}"
+      fi
+    fi
+  else
+    bashio::log.warning 'Remote branch could not be fetched; the next run will retry.'
+    return 1
+  fi
+
+  mkdir -p "${SNAPSHOT_DIR}"
+  local paths=(
+    automations.yaml blueprints configuration.yaml customize.yaml custom_components
+    esphome groups.yaml packages scenes.yaml scripts.yaml themes www zigbee2mqtt
+  )
+  local path
+  for path in "${paths[@]}"; do
+    copy_path "${path}"
+  done
+
+  if [[ "${include_secrets}" == 'true' ]]; then
+    copy_path 'secrets.yaml'
+  fi
+
+  # Only dashboard definitions are selected from .storage. Auth, tokens, and integrations remain excluded.
+  if [[ "${include_dashboards}" == 'true' ]]; then
+    copy_path '.storage/lovelace'
+    copy_path '.storage/lovelace_dashboards'
+  fi
+
+  git -C "${WORK_DIR}" add -A homeassistant
+  if git -C "${WORK_DIR}" diff --cached --quiet; then
+    bashio::log.info 'No configuration changes to sync.'
+    return 0
+  fi
+
+  local commit_message
+  commit_message="Home Assistant configuration sync $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+  git -C "${WORK_DIR}" commit -m "${commit_message}"
+  git -C "${WORK_DIR}" push origin "HEAD:${branch}"
+  bashio::log.info 'Configuration was committed and pushed successfully.'
+}
+
+interval_seconds=$((sync_interval_hours * 3600))
+bashio::log.info "Sync starts immediately and repeats every ${sync_interval_hours} hour(s)."
+while true; do
+  if ! sync_configuration; then
+    bashio::log.warning 'Configuration sync failed; retrying at the next scheduled interval.'
+  fi
+  sleep "${interval_seconds}"
 done
-
-if [[ "${include_secrets}" == 'true' ]]; then
-  copy_path 'secrets.yaml'
-fi
-
-# Only dashboard definitions are selected from .storage. Auth, tokens, and integrations remain excluded.
-if [[ "${include_dashboards}" == 'true' ]]; then
-  copy_path '.storage/lovelace'
-  copy_path '.storage/lovelace_dashboards'
-fi
-
-git -C "${WORK_DIR}" add -A homeassistant
-if git -C "${WORK_DIR}" diff --cached --quiet; then
-  bashio::log.info 'No configuration changes to sync.'
-  exit 0
-fi
-
-commit_message="Home Assistant configuration sync $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-git -C "${WORK_DIR}" commit -m "${commit_message}"
-git -C "${WORK_DIR}" push origin "HEAD:${branch}"
-bashio::log.info 'Configuration was committed and pushed successfully.'

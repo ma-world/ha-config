@@ -1,5 +1,5 @@
 name: HA Config Sync
-version: "1.0.0"
+version: "1.1.0"
 slug: ha_config_sync
 description: Copies selected Home Assistant configuration to Git and pushes it.
 url: https://github.com/ma-world/ha-config
@@ -10,7 +10,7 @@ arch:
   - armv7
   - i386
 startup: application
-boot: manual
+boot: auto
 init: false
 map:
   - config:rw
@@ -22,6 +22,7 @@ options:
   github_token: ""
   include_secrets: false
   include_dashboards: true
+  sync_interval_hours: 4
 schema:
   repository_url: str
   branch: str
@@ -30,3 +31,4 @@ schema:
   github_token: password
   include_secrets: bool
   include_dashboards: bool
+  sync_interval_hours: int(1,168)
