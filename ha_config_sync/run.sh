@@ -14,6 +14,7 @@ github_token="$(bashio::config 'github_token')"
 include_secrets="$(bashio::config 'include_secrets')"
 include_dashboards="$(bashio::config 'include_dashboards')"
 sync_interval_hours="$(bashio::config 'sync_interval_hours')"
+gitignore="$(bashio::config 'gitignore')"
 
 if [[ -z "${repository_url}" ]]; then
   bashio::log.fatal 'repository_url must be configured.'
@@ -70,6 +71,19 @@ copy_path() {
   fi
 }
 
+write_gitignore() {
+  local gitignore_path="${WORK_DIR}/.gitignore"
+
+  if [[ -z "${gitignore}" ]]; then
+    rm -f "${gitignore_path}"
+    return
+  fi
+
+  # This value is edited on the add-on configuration page. It is deliberately
+  # written to the backup repository so Git applies it before staging a snapshot.
+  printf '%s\n' "${gitignore}" >"${gitignore_path}"
+}
+
 sync_configuration() {
   mkdir -p "${WORK_DIR}"
   if [[ ! -d "${WORK_DIR}/.git" ]]; then
@@ -97,6 +111,8 @@ sync_configuration() {
     return 1
   fi
 
+  write_gitignore
+
   mkdir -p "${SNAPSHOT_DIR}"
   local paths=(
     automations.yaml blueprints configuration.yaml customize.yaml custom_components
@@ -117,7 +133,13 @@ sync_configuration() {
     copy_path '.storage/lovelace_dashboards'
   fi
 
-  git -C "${WORK_DIR}" add -A homeassistant
+  git -C "${WORK_DIR}" add -A -- homeassistant
+  # Stage the user-managed ignore file when it exists and stage its deletion
+  # when the editor was intentionally cleared.
+  git -C "${WORK_DIR}" add -u -- .gitignore
+  if [[ -e "${WORK_DIR}/.gitignore" ]]; then
+    git -C "${WORK_DIR}" add -- .gitignore
+  fi
   if git -C "${WORK_DIR}" diff --cached --quiet; then
     bashio::log.info 'No configuration changes to sync.'
     return 0
