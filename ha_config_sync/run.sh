@@ -26,10 +26,9 @@ if ! [[ "${sync_interval_hours}" =~ ^[1-9][0-9]*$ ]] || (( sync_interval_hours >
   exit 1
 fi
 
-# HTTPS repositories need a GitHub fine-grained PAT with repository Contents: Read and write.
-# SSH URLs use the add-on container SSH configuration instead and do not need github_token.
-if [[ "${repository_url}" == https://* && -z "${github_token}" ]]; then
-  bashio::log.fatal 'github_token is required when repository_url uses HTTPS.'
+# A GitHub token is also used to verify that the configured destination is private.
+if [[ -z "${github_token}" ]]; then
+  bashio::log.fatal 'github_token is required to verify that the backup repository is private.'
   exit 1
 fi
 
@@ -53,6 +52,49 @@ ASKPASS
   export GIT_TERMINAL_PROMPT=0
   export GITHUB_TOKEN="${github_token}"
 fi
+
+verify_private_repository() {
+  local repository_slug api_response private_status
+
+  case "${repository_url}" in
+    https://github.com/*)
+      repository_slug="${repository_url#https://github.com/}"
+      ;;
+    git@github.com:*)
+      repository_slug="${repository_url#git@github.com:}"
+      ;;
+    ssh://git@github.com/*)
+      repository_slug="${repository_url#ssh://git@github.com/}"
+      ;;
+    *)
+      bashio::log.fatal 'The backup repository must be a GitHub repository so its private visibility can be verified.'
+      return 1
+      ;;
+  esac
+
+  repository_slug="${repository_slug%/}"
+  repository_slug="${repository_slug%.git}"
+  if ! [[ "${repository_slug}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+    bashio::log.fatal 'repository_url must identify one GitHub owner/repository pair.'
+    return 1
+  fi
+
+  if ! api_response="$(curl --fail --silent --show-error \
+    --header "Accept: application/vnd.github+json" \
+    --header "Authorization: Bearer ${github_token}" \
+    "https://api.github.com/repos/${repository_slug}")"; then
+    bashio::log.fatal 'Could not verify the target repository visibility. No configuration data will be copied or pushed.'
+    return 1
+  fi
+
+  private_status="$(printf '%s' "${api_response}" | jq -r '.private // empty')"
+  if [[ "${private_status}" != 'true' ]]; then
+    bashio::log.fatal 'The target repository is not private. No configuration data will be copied or pushed.'
+    return 1
+  fi
+
+  bashio::log.info 'Verified that the target repository is private.'
+}
 
 copy_path() {
   local relative_path="$1"
@@ -85,6 +127,8 @@ write_gitignore() {
 }
 
 sync_configuration() {
+  verify_private_repository || return 1
+
   mkdir -p "${WORK_DIR}"
   if [[ ! -d "${WORK_DIR}/.git" ]]; then
     bashio::log.info 'Initializing local repository clone.'

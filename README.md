@@ -16,7 +16,7 @@ This is a **public Home Assistant add-on repository**. The add-on copies selecte
    https://github.com/<YOUR USER NAME>/homeassistant-config-files.git
    ```
 
-4. Create a GitHub fine-grained personal access token with **Contents: Read and write** access to that backup repository, then enter it as `github_token` in the add-on configuration. The token is stored only in the add-on configuration and is never committed to Git.
+4. Create a GitHub fine-grained personal access token with **Contents: Read and write** access to that backup repository, then enter it as `github_token` in the add-on configuration. The add-on also uses it to verify the repository visibility before every sync. The token is stored only in the add-on configuration and is never committed to Git.
 5. Set `sync_interval_hours` to the desired interval. The allowed range is 1 to 168 hours; the default is 4.
 6. Use the **`gitignore` editor** on the add-on configuration page to control which copied files Git excludes. The default rules exclude runtime data and `secrets.yaml`. The configured rules are written as `.gitignore` in your backup repository.
 7. Start the add-on. It performs an initial sync immediately and remains active for subsequent scheduled syncs.
@@ -24,6 +24,8 @@ This is a **public Home Assistant add-on repository**. The add-on copies selecte
 ## Included files
 
 By default, the add-on stores `configuration.yaml`, automations, scripts, scenes, packages, blueprints, themes, `custom_components`, ESPHome, Zigbee2MQTT, and WWW files. Lovelace dashboard definitions can also be included.
+
+Before copying or pushing any configuration data, the add-on checks the GitHub API and proceeds only if the target repository is private. If visibility cannot be verified or the repository is public, it writes an error to the add-on log and does not perform a backup.
 
 Runtime data, databases, logs, authentication data, tokens, and `secrets.yaml` are excluded by default. This reduces the risk of committing credentials to Git. You can explicitly enable `secrets.yaml` in the add-on options; use a private backup repository if you do.
 
