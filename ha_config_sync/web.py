@@ -3,6 +3,7 @@
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from datetime import datetime, timezone
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
@@ -76,14 +77,18 @@ def repository_gitignore() -> str | None:
 
 
 def read_rules() -> str:
-    # Prefer a previously saved editor value. When updating from older add-on
-    # versions, migrate the existing backup repository .gitignore instead of
-    # replacing it with defaults or showing an empty editor.
-    if GITIGNORE_FILE.exists():
-        try:
-            return GITIGNORE_FILE.read_text(encoding="utf-8")
-        except OSError:
-            pass
+    # An empty editor file was created by older releases during migration.
+    # Treat it as uninitialized and recover the existing repository rules or
+    # secure defaults instead of showing an empty editor.
+    try:
+        saved_rules = GITIGNORE_FILE.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        saved_rules = None
+    except OSError:
+        saved_rules = None
+
+    if saved_rules and saved_rules.strip():
+        return saved_rules
 
     rules = repository_gitignore() or DEFAULT_RULES
     GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -105,6 +110,16 @@ def git_last_commit() -> str | None:
         return None
 
 
+def format_timestamp(value: str | None, fallback: str) -> str:
+    if not value:
+        return fallback
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    except ValueError:
+        return value
+
+
 def read_status() -> dict[str, str]:
     try:
         import json
@@ -112,10 +127,12 @@ def read_status() -> dict[str, str]:
     except (FileNotFoundError, ValueError):
         status = {}
     return {
-        "last_check": status.get("last_check", "Not checked yet"),
+        "last_check": format_timestamp(status.get("last_check"), "Not checked yet"),
         # Fall back to the existing local Git history so the UI shows commits
         # made before this status tracking feature was introduced.
-        "last_commit": status.get("last_commit") or git_last_commit() or "No commits yet",
+        "last_commit": format_timestamp(
+            status.get("last_commit") or git_last_commit(), "No commits yet"
+        ),
     }
 
 
