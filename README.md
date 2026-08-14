@@ -18,7 +18,7 @@ This is a **public Home Assistant add-on repository**. The add-on copies selecte
 
 4. Create a GitHub fine-grained personal access token with **Contents: Read and write** access to that backup repository, then enter it as `github_token` in the add-on configuration. The add-on also uses it to verify the repository visibility before every sync. The token is stored only in the add-on configuration and is never committed to Git.
 5. Set `sync_interval_hours` to the desired interval. The allowed range is 1 to 168 hours; the default is 4.
-6. Open **Git Ignore Editor** from the Home Assistant sidebar to edit the ignore rules in a dedicated multi-line editor. The editor has 15 visible lines, scrolls for longer rule sets, and writes the rules as `.gitignore` in your backup repository.
+6. Open the **HA Config Sync** app page and select **Open Web UI** to edit the ignore rules in a dedicated multi-line editor. The editor has 15 visible lines, scrolls for longer rule sets, and writes the rules as `.gitignore` in your backup repository.
 7. Start the add-on. If the selected private repository is empty, the add-on initializes its configured branch with a README before copying any Home Assistant files. It then performs the initial sync and remains active for subsequent scheduled syncs.
 
 ## Included files
@@ -31,7 +31,7 @@ Runtime data, databases, logs, authentication data, tokens, and `secrets.yaml` a
 
 ## Changing the interval or Git ignore rules
 
-Open the **HA Config Sync** add-on to change `sync_interval_hours`. Open **Git Ignore Editor** from the Home Assistant sidebar to change ignore rules; saving there takes effect on the next sync without restarting the add-on. The configured ignore rules apply only to files in the backup repository.
+Open the **HA Config Sync** app page to change `sync_interval_hours`. Select **Open Web UI** on the same app page to change ignore rules; saving there takes effect on the next sync without restarting the add-on. The configured ignore rules apply only to files in the backup repository.
 
 > **Security note:** Keep `homeassistant/secrets.yaml` in `gitignore` unless you fully understand the implications and use a private repository. Git ignore rules do not remove files that were committed previously; remove those files and their history separately if needed.
 
