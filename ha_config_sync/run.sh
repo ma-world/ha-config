@@ -7,6 +7,7 @@ readonly WORK_DIR=/data/repository
 readonly SNAPSHOT_DIR="${WORK_DIR}/homeassistant"
 readonly GITIGNORE_FILE=/data/gitignore
 readonly STATUS_FILE=/data/sync-status.json
+readonly ADDON_OPTIONS_FILE=/data/options.json
 
 repository_url="$(bashio::config 'repository_url')"
 branch="$(bashio::config 'branch')"
@@ -55,6 +56,16 @@ ASKPASS
   export GIT_TERMINAL_PROMPT=0
   export GITHUB_TOKEN="${github_token}"
 fi
+
+gitignore_excludes_secrets() {
+  [[ -f "${GITIGNORE_FILE}" ]] || return 1
+  grep -Eq '^[[:space:]]*/?homeassistant/secrets\.yaml[[:space:]]*$' "${GITIGNORE_FILE}"
+}
+
+include_secrets_is_enabled() {
+  [[ -f "${ADDON_OPTIONS_FILE}" ]] || return 1
+  jq -e '.include_secrets == true' "${ADDON_OPTIONS_FILE}" >/dev/null 2>&1
+}
 
 write_status() {
   local status_key="$1"
@@ -226,6 +237,8 @@ sync_configuration() {
 
   if [[ "${include_secrets}" == 'true' ]]; then
     copy_path 'secrets.yaml'
+  elif ! gitignore_excludes_secrets; then
+    bashio::log.warning 'secrets.yaml is not ignored, but Include secrets is disabled. It will not be copied or committed.'
   fi
 
   # Only dashboard definitions are selected from .storage. Auth, tokens, and integrations remain excluded.

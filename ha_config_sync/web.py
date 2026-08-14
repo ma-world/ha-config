@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlparse
 
 GITIGNORE_FILE = Path("/data/gitignore")
 STATUS_FILE = Path("/data/sync-status.json")
+OPTIONS_FILE = Path("/data/options.json")
 REPOSITORY_DIR = Path("/data/repository")
 ADDON_VERSION = os.getenv("ADDON_VERSION", "unknown")
 PROJECT_URL = "https://github.com/ma-world/ha-config"
@@ -43,12 +44,13 @@ PAGE = """<!doctype html>
     textarea { box-sizing: border-box; display: block; width: 100%; min-height: 24em; resize: vertical; overflow-y: auto; padding: 12px; border: 1px solid #89939e; border-radius: 6px; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
     button { margin-top: 16px; padding: 10px 18px; border: 0; border-radius: 5px; background: #03a9f4; color: #fff; font-weight: 700; cursor: pointer; }
     .notice { padding: 10px 12px; border-radius: 6px; background: #d9f5e5; color: #095a31; }
+    .warning { padding: 10px 12px; border-radius: 6px; background: #fff1c2; color: #6a4600; line-height: 1.5; }
     .status { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 16px 0; }
     .status-item { padding: 12px; border: 1px solid #c7cdd4; border-radius: 6px; }
     .status-label { display: block; font-size: .85rem; color: #5e6b76; }
     .status-value { display: block; margin-top: 4px; font-weight: 700; }
     code { background: #e8ebef; padding: 2px 4px; border-radius: 3px; }
-    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } code { background: #343d46; } }
+    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .warning { background: #4a3612; color: #ffe2a3; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } code { background: #343d46; } }
   </style>
 </head>
 <body>
@@ -63,6 +65,7 @@ PAGE = """<!doctype html>
     <div class="status-item"><span class="status-label">Last commit with changes</span><span class="status-value">{last_commit}</span></div>
   </div>
   <p>These rules are copied to <code>.gitignore</code> in the private backup repository before every sync. The editor shows 15 lines and scrolls for longer rule sets.</p>
+  {secrets_warning}
   <p><strong>Security:</strong> Keep <code>homeassistant/secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
   <form method="post" action="save">
     <textarea name="gitignore" rows="15" spellcheck="false" aria-label="Git ignore rules">{rules}</textarea>
@@ -129,6 +132,35 @@ def format_timestamp(value: str | None, fallback: str) -> str:
         return value
 
 
+def include_secrets_enabled() -> bool:
+    try:
+        import json
+        return json.loads(OPTIONS_FILE.read_text(encoding="utf-8")).get("include_secrets") is True
+    except (FileNotFoundError, ValueError):
+        return False
+
+
+def secrets_warning(rules: str) -> str:
+    secrets_ignored = any(
+        line.strip().lstrip("/") == "homeassistant/secrets.yaml"
+        for line in rules.splitlines()
+        if not line.strip().startswith("#")
+    )
+    if not secrets_ignored and not include_secrets_enabled():
+        return ("<p class='warning'><strong>Secrets are still protected.</strong> "
+                "The ignore rule for <code>homeassistant/secrets.yaml</code> was removed, "
+                "but <strong>Include secrets</strong> is disabled in the add-on configuration. "
+                "The file will not be copied or committed until you explicitly enable that option.</p>")
+    if include_secrets_enabled() and secrets_ignored:
+        return ("<p class='warning'><strong>Secrets will not be committed.</strong> "
+                "<strong>Include secrets</strong> is enabled, but "
+                "<code>homeassistant/secrets.yaml</code> is still ignored by these rules.</p>")
+    if include_secrets_enabled() and not secrets_ignored:
+        return ("<p class='warning'><strong>Secrets backup is enabled.</strong> "
+                "<code>homeassistant/secrets.yaml</code> can be committed to your private backup repository.</p>")
+    return ""
+
+
 def read_status() -> dict[str, str]:
     try:
         import json
@@ -153,8 +185,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         message = "<p class=\"notice\">Ignore rules saved.</p>" if "saved=1" in self.path else ""
         status = read_status()
+        rules = read_rules()
         page = (PAGE.replace("{notice}", message)
-                     .replace("{rules}", html_escape(read_rules()))
+                     .replace("{secrets_warning}", secrets_warning(rules))
+                     .replace("{rules}", html_escape(rules))
                      .replace("{last_check}", html_escape(status["last_check"]))
                      .replace("{last_commit}", html_escape(status["last_commit"]))
                      .replace("{version}", html_escape(ADDON_VERSION))

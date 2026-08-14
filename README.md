@@ -27,7 +27,7 @@ By default, the add-on stores `configuration.yaml`, automations, scripts, scenes
 
 Before copying or pushing any configuration data, the add-on checks the GitHub API and proceeds only if the target repository is private. If visibility cannot be verified or the repository is public, it writes an error to the add-on log and does not perform a backup. If the private repository is empty, it creates and pushes an English README that identifies it as a backup destination for this add-on, then continues with the normal sync.
 
-Runtime data, databases, logs, authentication data, tokens, and `secrets.yaml` are excluded by default. This reduces the risk of committing credentials to Git. You can explicitly enable `secrets.yaml` in the add-on options; use a private backup repository if you do.
+Runtime data, databases, logs, authentication data, tokens, and `secrets.yaml` are excluded by default. This reduces the risk of committing credentials to Git. The Git Ignore Editor warns if its `secrets.yaml` rule and the explicit `include_secrets` option do not match. Removing the ignore rule alone never enables secret backups; you must also explicitly enable `include_secrets` in the add-on configuration. Use a private backup repository if you do.
 
 ## Changing the interval or Git ignore rules
 
