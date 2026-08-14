@@ -18,7 +18,7 @@ This is a **public Home Assistant add-on repository**. The add-on copies selecte
 
 4. Create a GitHub fine-grained personal access token with **Contents: Read and write** access to that backup repository, then enter it as `github_token` in the add-on configuration. The add-on also uses it to verify the repository visibility before every sync. The token is stored only in the add-on configuration and is never committed to Git.
 5. Set `sync_interval_hours` to the desired interval. The allowed range is 1 to 168 hours; the default is 4.
-6. Use the **`gitignore` editor** on the add-on configuration page to control which copied files Git excludes. The default rules exclude runtime data and `secrets.yaml`. The configured rules are written as `.gitignore` in your backup repository.
+6. Open **Git Ignore Editor** from the Home Assistant sidebar to edit the ignore rules in a dedicated multi-line editor. The editor has 15 visible lines, scrolls for longer rule sets, and writes the rules as `.gitignore` in your backup repository.
 7. Start the add-on. It performs an initial sync immediately and remains active for subsequent scheduled syncs.
 
 ## Included files
@@ -31,7 +31,7 @@ Runtime data, databases, logs, authentication data, tokens, and `secrets.yaml` a
 
 ## Changing the interval or Git ignore rules
 
-Open the **HA Config Sync** add-on and update `sync_interval_hours` or the multi-line `gitignore` editor. Save the configuration and restart the add-on for the new settings to take effect. The configured ignore rules apply only to files in the backup repository.
+Open the **HA Config Sync** add-on to change `sync_interval_hours`. Open **Git Ignore Editor** from the Home Assistant sidebar to change ignore rules; saving there takes effect on the next sync without restarting the add-on. The configured ignore rules apply only to files in the backup repository.
 
 > **Security note:** Keep `homeassistant/secrets.yaml` in `gitignore` unless you fully understand the implications and use a private repository. Git ignore rules do not remove files that were committed previously; remove those files and their history separately if needed.
 

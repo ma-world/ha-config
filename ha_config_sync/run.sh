@@ -5,6 +5,7 @@ set -Eeuo pipefail
 readonly CONFIG_DIR=/config
 readonly WORK_DIR=/data/repository
 readonly SNAPSHOT_DIR="${WORK_DIR}/homeassistant"
+readonly GITIGNORE_FILE=/data/gitignore
 
 repository_url="$(bashio::config 'repository_url')"
 branch="$(bashio::config 'branch')"
@@ -14,7 +15,6 @@ github_token="$(bashio::config 'github_token')"
 include_secrets="$(bashio::config 'include_secrets')"
 include_dashboards="$(bashio::config 'include_dashboards')"
 sync_interval_hours="$(bashio::config 'sync_interval_hours')"
-gitignore="$(bashio::config 'gitignore')"
 
 if [[ -z "${repository_url}" ]]; then
   bashio::log.fatal 'repository_url must be configured.'
@@ -32,9 +32,19 @@ if [[ -z "${github_token}" ]]; then
   exit 1
 fi
 
+# Migrate the old configuration field once, then let the add-on panel own the
+# editable rules. This keeps the multi-line editor independent from the add-on
+# configuration form.
+if [[ ! -f "${GITIGNORE_FILE}" ]]; then
+  bashio::config 'gitignore' >"${GITIGNORE_FILE}"
+  chmod 600 "${GITIGNORE_FILE}"
+fi
+
 askpass_file=''
+web_pid=''
 cleanup() {
   [[ -n "${askpass_file}" && -f "${askpass_file}" ]] && rm -f "${askpass_file}"
+  [[ -n "${web_pid}" ]] && kill "${web_pid}" 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -195,6 +205,10 @@ sync_configuration() {
   git -C "${WORK_DIR}" push origin "HEAD:${branch}"
   bashio::log.info 'Configuration was committed and pushed successfully.'
 }
+
+# The panel is served only on Home Assistant's authenticated ingress endpoint.
+python3 /web.py &
+web_pid=$!
 
 interval_seconds=$((sync_interval_hours * 3600))
 bashio::log.info "Sync starts immediately and repeats every ${sync_interval_hours} hour(s)."
