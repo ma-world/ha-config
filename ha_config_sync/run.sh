@@ -32,11 +32,20 @@ if [[ -z "${github_token}" ]]; then
   exit 1
 fi
 
-# Migrate the old configuration field once, then let the add-on panel own the
-# editable rules. This keeps the multi-line editor independent from the add-on
-# configuration form.
+# The web UI owns the editable ignore rules. Start it with secure default
+# exclusions when no rules have been saved yet.
 if [[ ! -f "${GITIGNORE_FILE}" ]]; then
-  bashio::config 'gitignore' >"${GITIGNORE_FILE}"
+  cat >"${GITIGNORE_FILE}" <<'GITIGNORE'
+# Runtime and generated Home Assistant data
+homeassistant/home-assistant_v2.db*
+homeassistant/*.log
+homeassistant/.storage/*
+!homeassistant/.storage/lovelace
+!homeassistant/.storage/lovelace_dashboards
+
+# Credentials are excluded unless you deliberately change this rule
+homeassistant/secrets.yaml
+GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 fi
 
