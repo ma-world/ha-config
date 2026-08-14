@@ -33,23 +33,6 @@ if [[ -z "${github_token}" ]]; then
   exit 1
 fi
 
-# The web UI owns the editable ignore rules. Start it with secure default
-# exclusions when no rules have been saved yet.
-if [[ ! -f "${GITIGNORE_FILE}" ]]; then
-  cat >"${GITIGNORE_FILE}" <<'GITIGNORE'
-# Runtime and generated Home Assistant data
-homeassistant/home-assistant_v2.db*
-homeassistant/*.log
-homeassistant/.storage/*
-!homeassistant/.storage/lovelace
-!homeassistant/.storage/lovelace_dashboards
-
-# Credentials are excluded unless you deliberately change this rule
-homeassistant/secrets.yaml
-GITIGNORE
-  chmod 600 "${GITIGNORE_FILE}"
-fi
-
 askpass_file=''
 web_pid=''
 cleanup() {
@@ -222,6 +205,11 @@ sync_configuration() {
     fi
   else
     initialize_empty_remote_repository || return 1
+  fi
+
+  # Preserve visibility of commits made before status tracking was introduced.
+  if [[ ! -f "${STATUS_FILE}" ]] && git -C "${WORK_DIR}" rev-parse --verify --quiet HEAD >/dev/null; then
+    write_status last_commit
   fi
 
   write_gitignore

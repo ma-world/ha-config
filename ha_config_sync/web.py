@@ -3,10 +3,12 @@
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import subprocess
 from urllib.parse import parse_qs, urlparse
 
 GITIGNORE_FILE = Path("/data/gitignore")
 STATUS_FILE = Path("/data/sync-status.json")
+REPOSITORY_DIR = Path("/data/repository")
 DEFAULT_RULES = """# Runtime and generated Home Assistant data
 homeassistant/home-assistant_v2.db*
 homeassistant/*.log
@@ -65,12 +67,42 @@ def html_escape(value: str) -> str:
                  .replace(">", "&gt;").replace('"', "&quot;"))
 
 
+def repository_gitignore() -> str | None:
+    path = REPOSITORY_DIR / ".gitignore"
+    try:
+        return path.read_text(encoding="utf-8") if path.is_file() else None
+    except OSError:
+        return None
+
+
 def read_rules() -> str:
-    if not GITIGNORE_FILE.exists():
-        GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        GITIGNORE_FILE.write_text(DEFAULT_RULES, encoding="utf-8")
-        GITIGNORE_FILE.chmod(0o600)
-    return GITIGNORE_FILE.read_text(encoding="utf-8")
+    # Prefer a previously saved editor value. When updating from older add-on
+    # versions, migrate the existing backup repository .gitignore instead of
+    # replacing it with defaults or showing an empty editor.
+    if GITIGNORE_FILE.exists():
+        try:
+            return GITIGNORE_FILE.read_text(encoding="utf-8")
+        except OSError:
+            pass
+
+    rules = repository_gitignore() or DEFAULT_RULES
+    GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    GITIGNORE_FILE.write_text(rules, encoding="utf-8")
+    GITIGNORE_FILE.chmod(0o600)
+    return rules
+
+
+def git_last_commit() -> str | None:
+    if not (REPOSITORY_DIR / ".git").is_dir():
+        return None
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(REPOSITORY_DIR), "log", "-1", "--format=%cI"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip() or None
+    except (OSError, subprocess.CalledProcessError):
+        return None
 
 
 def read_status() -> dict[str, str]:
@@ -81,7 +113,9 @@ def read_status() -> dict[str, str]:
         status = {}
     return {
         "last_check": status.get("last_check", "Not checked yet"),
-        "last_commit": status.get("last_commit", "No changes committed yet"),
+        # Fall back to the existing local Git history so the UI shows commits
+        # made before this status tracking feature was introduced.
+        "last_commit": status.get("last_commit") or git_last_commit() or "No commits yet",
     }
 
 
