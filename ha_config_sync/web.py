@@ -4,12 +4,15 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from datetime import datetime, timezone
+import os
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
 GITIGNORE_FILE = Path("/data/gitignore")
 STATUS_FILE = Path("/data/sync-status.json")
 REPOSITORY_DIR = Path("/data/repository")
+ADDON_VERSION = os.getenv("ADDON_VERSION", "unknown")
+PROJECT_URL = "https://github.com/ma-world/ha-config"
 DEFAULT_RULES = """# Runtime and generated Home Assistant data
 homeassistant/home-assistant_v2.db*
 homeassistant/*.log
@@ -32,7 +35,10 @@ PAGE = """<!doctype html>
     body { margin: 0; background: #f4f6f8; color: #1f2933; }
     main { max-width: 900px; margin: 28px auto; padding: 0 20px; }
     section { background: #fff; padding: 24px; border-radius: 10px; box-shadow: 0 2px 8px #0002; }
-    h1 { margin-top: 0; font-size: 1.5rem; }
+    h1 { margin: 0; font-size: 1.5rem; }
+    .header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    .metadata { color: #5e6b76; font-size: .9rem; white-space: nowrap; }
+    a { color: #0288d1; }
     p { line-height: 1.5; }
     textarea { box-sizing: border-box; display: block; width: 100%; min-height: 24em; resize: vertical; overflow-y: auto; padding: 12px; border: 1px solid #89939e; border-radius: 6px; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
     button { margin-top: 16px; padding: 10px 18px; border: 0; border-radius: 5px; background: #03a9f4; color: #fff; font-weight: 700; cursor: pointer; }
@@ -42,12 +48,15 @@ PAGE = """<!doctype html>
     .status-label { display: block; font-size: .85rem; color: #5e6b76; }
     .status-value { display: block; margin-top: 4px; font-weight: 700; }
     code { background: #e8ebef; padding: 2px 4px; border-radius: 3px; }
-    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .status-item { border-color: #48535e; } .status-label { color: #b5c0c9; } code { background: #343d46; } }
+    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } code { background: #343d46; } }
   </style>
 </head>
 <body>
 <main><section>
-  <h1>Git Ignore Editor</h1>
+  <div class="header">
+    <h1>Git Ignore Editor</h1>
+    <span class="metadata">Version {version} · <a href="{project_url}" target="_blank" rel="noopener noreferrer">GitHub project</a></span>
+  </div>
   {notice}
   <div class="status">
     <div class="status-item"><span class="status-label">Last check</span><span class="status-value">{last_check}</span></div>
@@ -147,7 +156,9 @@ class Handler(BaseHTTPRequestHandler):
         page = (PAGE.replace("{notice}", message)
                      .replace("{rules}", html_escape(read_rules()))
                      .replace("{last_check}", html_escape(status["last_check"]))
-                     .replace("{last_commit}", html_escape(status["last_commit"])))
+                     .replace("{last_commit}", html_escape(status["last_commit"]))
+                     .replace("{version}", html_escape(ADDON_VERSION))
+                     .replace("{project_url}", PROJECT_URL))
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(page.encode("utf-8"))))

@@ -4,6 +4,9 @@ FROM ${BUILD_FROM}
 RUN apk add --no-cache git openssh-client rsync jq curl python3
 
 COPY run.sh /run.sh
+ARG BUILD_VERSION
+ENV ADDON_VERSION=${BUILD_VERSION}
+
 COPY web.py /web.py
 RUN chmod a+x /run.sh
 
