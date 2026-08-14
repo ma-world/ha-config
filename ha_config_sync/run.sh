@@ -126,14 +126,37 @@ copy_path() {
 write_gitignore() {
   local gitignore_path="${WORK_DIR}/.gitignore"
 
-  if [[ -z "${gitignore}" ]]; then
+  if [[ ! -s "${GITIGNORE_FILE}" ]]; then
     rm -f "${gitignore_path}"
     return
   fi
 
-  # This value is edited on the add-on configuration page. It is deliberately
-  # written to the backup repository so Git applies it before staging a snapshot.
-  printf '%s\n' "${gitignore}" >"${gitignore_path}"
+  # The add-on panel controls this file. Copy it into the backup repository so
+  # Git applies the configured rules before staging a snapshot.
+  cp "${GITIGNORE_FILE}" "${gitignore_path}"
+}
+
+initialize_empty_remote_repository() {
+  if git -C "${WORK_DIR}" show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+    return 0
+  fi
+
+  bashio::log.info "Remote branch '${branch}' does not exist yet; initializing the private backup repository."
+  cat >"${WORK_DIR}/README.md" <<'README'
+# Home Assistant Configuration Backup
+
+Home Assistant configuration files are backed up here by the [HA Config Sync add-on](https://github.com/ma-world/ha-config.git).
+README
+  git -C "${WORK_DIR}" add README.md
+  if ! git -C "${WORK_DIR}" commit -m 'Initialize Home Assistant configuration backup repository'; then
+    bashio::log.fatal 'Could not create the initial README commit for the backup repository.'
+    return 1
+  fi
+  if ! git -C "${WORK_DIR}" push --set-upstream origin "HEAD:${branch}"; then
+    bashio::log.fatal 'Could not push the initial README to the backup repository. No Home Assistant files were copied.'
+    return 1
+  fi
+  git -C "${WORK_DIR}" fetch --prune origin "${branch}"
 }
 
 sync_configuration() {
@@ -151,18 +174,21 @@ sync_configuration() {
   git -C "${WORK_DIR}" config user.name "${git_name}"
   git -C "${WORK_DIR}" config user.email "${git_email}"
 
-  # Incorporate commits made outside Home Assistant before creating a new snapshot.
-  if git -C "${WORK_DIR}" fetch --prune origin "${branch}"; then
-    if git -C "${WORK_DIR}" show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
-      if git -C "${WORK_DIR}" rev-parse --verify --quiet HEAD >/dev/null; then
-        git -C "${WORK_DIR}" rebase "origin/${branch}"
-      else
-        git -C "${WORK_DIR}" checkout -B "${branch}" "origin/${branch}"
-      fi
-    fi
-  else
+  # Pull an existing branch first. When GitHub reports an empty repository,
+  # initialize it with a README before any Home Assistant data is copied.
+  if ! git -C "${WORK_DIR}" fetch --prune origin "${branch}"; then
     bashio::log.warning 'Remote branch could not be fetched; the next run will retry.'
     return 1
+  fi
+
+  if git -C "${WORK_DIR}" show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+    if git -C "${WORK_DIR}" rev-parse --verify --quiet HEAD >/dev/null; then
+      git -C "${WORK_DIR}" rebase "origin/${branch}"
+    else
+      git -C "${WORK_DIR}" checkout -B "${branch}" "origin/${branch}"
+    fi
+  else
+    initialize_empty_remote_repository || return 1
   fi
 
   write_gitignore

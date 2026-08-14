@@ -19,13 +19,13 @@ This is a **public Home Assistant add-on repository**. The add-on copies selecte
 4. Create a GitHub fine-grained personal access token with **Contents: Read and write** access to that backup repository, then enter it as `github_token` in the add-on configuration. The add-on also uses it to verify the repository visibility before every sync. The token is stored only in the add-on configuration and is never committed to Git.
 5. Set `sync_interval_hours` to the desired interval. The allowed range is 1 to 168 hours; the default is 4.
 6. Open **Git Ignore Editor** from the Home Assistant sidebar to edit the ignore rules in a dedicated multi-line editor. The editor has 15 visible lines, scrolls for longer rule sets, and writes the rules as `.gitignore` in your backup repository.
-7. Start the add-on. It performs an initial sync immediately and remains active for subsequent scheduled syncs.
+7. Start the add-on. If the selected private repository is empty, the add-on initializes its configured branch with a README before copying any Home Assistant files. It then performs the initial sync and remains active for subsequent scheduled syncs.
 
 ## Included files
 
 By default, the add-on stores `configuration.yaml`, automations, scripts, scenes, packages, blueprints, themes, `custom_components`, ESPHome, Zigbee2MQTT, and WWW files. Lovelace dashboard definitions can also be included.
 
-Before copying or pushing any configuration data, the add-on checks the GitHub API and proceeds only if the target repository is private. If visibility cannot be verified or the repository is public, it writes an error to the add-on log and does not perform a backup.
+Before copying or pushing any configuration data, the add-on checks the GitHub API and proceeds only if the target repository is private. If visibility cannot be verified or the repository is public, it writes an error to the add-on log and does not perform a backup. If the private repository is empty, it creates and pushes an English README that identifies it as a backup destination for this add-on, then continues with the normal sync.
 
 Runtime data, databases, logs, authentication data, tokens, and `secrets.yaml` are excluded by default. This reduces the risk of committing credentials to Git. You can explicitly enable `secrets.yaml` in the add-on options; use a private backup repository if you do.
 
