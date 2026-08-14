@@ -6,6 +6,7 @@ readonly CONFIG_DIR=/config
 readonly WORK_DIR=/data/repository
 readonly SNAPSHOT_DIR="${WORK_DIR}/homeassistant"
 readonly GITIGNORE_FILE=/data/gitignore
+readonly STATUS_FILE=/data/sync-status.json
 
 repository_url="$(bashio::config 'repository_url')"
 branch="$(bashio::config 'branch')"
@@ -71,6 +72,28 @@ ASKPASS
   export GIT_TERMINAL_PROMPT=0
   export GITHUB_TOKEN="${github_token}"
 fi
+
+write_status() {
+  local status_key="$1"
+  local timestamp
+  timestamp="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+  python3 - "${STATUS_FILE}" "${status_key}" "${timestamp}" <<'PYTHON'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+key = sys.argv[2]
+timestamp = sys.argv[3]
+try:
+    status = json.loads(path.read_text(encoding="utf-8"))
+except (FileNotFoundError, json.JSONDecodeError):
+    status = {}
+status[key] = timestamp
+path.write_text(json.dumps(status), encoding="utf-8")
+path.chmod(0o600)
+PYTHON
+}
 
 verify_private_repository() {
   local repository_slug api_response private_status
@@ -169,6 +192,7 @@ README
 }
 
 sync_configuration() {
+  write_status last_check
   verify_private_repository || return 1
 
   mkdir -p "${WORK_DIR}"
@@ -243,6 +267,7 @@ sync_configuration() {
     bashio::log.error 'Configuration commit was created locally, but the push failed. The next scheduled sync will retry.'
     return 1
   fi
+  write_status last_commit
   bashio::log.info 'Configuration was committed and pushed successfully.'
 }
 
