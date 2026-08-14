@@ -71,7 +71,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         message = "<p class=\"notice\">Ignore rules saved.</p>" if "saved=1" in self.path else ""
-        page = PAGE.format(notice=message, rules=html_escape(read_rules()))
+        page = (PAGE.replace("{notice}", message)
+                     .replace("{rules}", html_escape(read_rules())))
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(page.encode("utf-8"))))

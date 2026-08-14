@@ -225,7 +225,9 @@ sync_configuration() {
   git -C "${WORK_DIR}" add -A -- homeassistant
   # Stage the user-managed ignore file when it exists and stage its deletion
   # when the editor was intentionally cleared.
-  git -C "${WORK_DIR}" add -u -- .gitignore
+  if git -C "${WORK_DIR}" ls-files --error-unmatch .gitignore >/dev/null 2>&1; then
+    git -C "${WORK_DIR}" add -u -- .gitignore
+  fi
   if [[ -e "${WORK_DIR}/.gitignore" ]]; then
     git -C "${WORK_DIR}" add -- .gitignore
   fi
@@ -237,7 +239,10 @@ sync_configuration() {
   local commit_message
   commit_message="Home Assistant configuration sync $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
   git -C "${WORK_DIR}" commit -m "${commit_message}"
-  git -C "${WORK_DIR}" push origin "HEAD:${branch}"
+  if ! git -C "${WORK_DIR}" push origin "HEAD:${branch}"; then
+    bashio::log.error 'Configuration commit was created locally, but the push failed. The next scheduled sync will retry.'
+    return 1
+  fi
   bashio::log.info 'Configuration was committed and pushed successfully.'
 }
 
