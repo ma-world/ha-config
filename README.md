@@ -36,3 +36,7 @@ Open the **HA Config Sync** app page to change `sync_interval_hours`. To edit Gi
 > **Security note:** Keep `homeassistant/secrets.yaml` in `gitignore` unless you fully understand the implications and use a private repository. Git ignore rules do not remove files that were committed previously; remove those files and their history separately if needed.
 
 The add-on log shows the result of each sync.
+
+## Changelog
+
+Home Assistant displays the release notes from [`ha_config_sync/CHANGELOG.md`](ha_config_sync/CHANGELOG.md) whenever an add-on update is available. Add an entry there before every future version bump.
