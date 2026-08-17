@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 1.7.2
+
+- Fixed the add-on information-page link to point to the public HA Config Sync repository.
+
 ## 1.7.1
 
 - Added Home Assistant add-on update notes through this changelog.

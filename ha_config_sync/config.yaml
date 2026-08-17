@@ -1,8 +1,8 @@
 name: HA Config Sync
-version: "1.7.1"
+version: "1.7.2"
 slug: ha_config_sync
 description: Copies selected Home Assistant configuration to Git and pushes it. To edit Git ignore rules, select Open Web UI.
-url: https://github.com/<YOUR USER NAME>/ha-config
+url: https://github.com/ma-world/ha-config
 arch:
   - aarch64
   - amd64
