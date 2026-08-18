@@ -56,10 +56,7 @@ PAGE = """<!doctype html>
     p { line-height: 1.5; }
     .repository-link { display: inline-block; margin: 0 0 16px; padding: 9px 14px; border-radius: 5px; background: #37474f; color: #fff; font-weight: 700; text-decoration: none; }
     .repository-link:hover { background: #455a64; }
-    textarea { box-sizing: border-box; display: block; width: 100%; min-height: 24em; resize: vertical; overflow-y: auto; padding: 12px; border: 1px solid #89939e; border-radius: 6px; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
     button { margin-top: 16px; margin-right: 8px; padding: 10px 18px; border: 0; border-radius: 5px; background: #03a9f4; color: #fff; font-weight: 700; cursor: pointer; }
-    button:disabled { opacity: .65; cursor: wait; }
-    #save-status { margin-top: 12px; }
     .danger-button { background: #c62828; }
     .danger-button:hover { background: #b71c1c; }
     .notice { padding: 10px 12px; border-radius: 6px; background: #d9f5e5; color: #095a31; }
@@ -107,10 +104,10 @@ PAGE = """<!doctype html>
     <h2>Diagnostics</h2>
     <p>These are selected diagnostic logs from the add-on’s persistent <code>/data</code> directory. Git metadata is never exposed here.</p>
     <div class="log-links">
-      <a class="log-link" href="sync-log" target="_blank">View sync log</a>
-      <a class="log-link" href="sync-log?download=1">Download sync log</a>
+      <a class="log-link" href="sync-log" target="_blank">View sync debug log</a>
+      <a class="log-link" href="sync-log?download=1">Download sync debug log</a>
     </div>
-    <h3>Latest sync log</h3>
+    <h3>Latest sync debug log</h3>
     <pre>{sync_log_preview}</pre>
   </section>
 </section></main>

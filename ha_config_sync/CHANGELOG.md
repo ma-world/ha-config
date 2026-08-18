@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.0.1
+
+- Restored explicit viewing and downloading of the persistent sync debug log in the Web UI Diagnostics section.
+- Corrected diagnostic text to identify `/homeassistant` as the read-only Home Assistant configuration source.
+
 ## 4.0.0
 
 - Removed the installation-specific hard-coded add-on configuration ID from the Git ignore path display.

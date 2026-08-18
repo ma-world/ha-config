@@ -93,8 +93,8 @@ export GIT_TERMINAL_PROMPT=0
 export GITHUB_TOKEN="${github_token}"
 
 safe_git() {
-  # Git metadata and the transient index live in /data. /config is used only
-  # as a read-only source tree. Do not add reset, clean, checkout, restore, or
+  # Git metadata and the transient index live in /data. /homeassistant is used
+  # only as a read-only source tree. Do not add reset, clean, checkout, restore, or
   # any worktree-mutating command to this add-on.
   GIT_INDEX_FILE="${INDEX_FILE}" \
   GIT_CONFIG_COUNT=1 \
@@ -191,16 +191,16 @@ initialize_empty_remote_repository() {
 
 
 rebuild_index_from_config() {
-  bashio::log.info 'Rebuilding isolated Git index from the read-only /config source tree.'
+  bashio::log.info 'Rebuilding isolated Git index from the read-only /homeassistant source tree.'
   # Rebuilding only the index applies ignore changes immediately without
-  # modifying a single file under /config.
+  # modifying a single file under /homeassistant.
   rm -f "${INDEX_FILE}"
   safe_git read-tree --empty
   safe_git add -A -- .
   bashio::log.info "Staged $(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" diff --cached --name-only | wc -l | tr -d ' ') path(s) after applying ignore rules."
 
   # Preserve a copy of the rules in the private repository under a neutral name.
-  # The original file remains in /config and is ignored by its own rules.
+  # The original file remains in persistent /data and is ignored by its own rules.
   mkdir -p "${SNAPSHOT_DIR}"
   cp "${GITIGNORE_FILE}" "${SNAPSHOT_DIR}/ha_config_sync.gitignore.backup"
   GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" --work-tree="${SNAPSHOT_DIR}" add -f ha_config_sync.gitignore.backup 2>/dev/null || true
