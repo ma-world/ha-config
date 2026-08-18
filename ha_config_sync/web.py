@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from datetime import datetime, timezone
 import os
+import json
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
@@ -58,6 +59,8 @@ PAGE = """<!doctype html>
     .repository-link:hover { background: #455a64; }
     textarea { box-sizing: border-box; display: block; width: 100%; min-height: 24em; resize: vertical; overflow-y: auto; padding: 12px; border: 1px solid #89939e; border-radius: 6px; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
     button { margin-top: 16px; margin-right: 8px; padding: 10px 18px; border: 0; border-radius: 5px; background: #03a9f4; color: #fff; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .65; cursor: wait; }
+    #save-status { margin-top: 12px; }
     .danger-button { background: #c62828; }
     .danger-button:hover { background: #b71c1c; }
     .notice { padding: 10px 12px; border-radius: 6px; background: #d9f5e5; color: #095a31; }
@@ -91,9 +94,10 @@ PAGE = """<!doctype html>
   <p>These rules are saved directly in the mounted Home Assistant configuration directory as <code>ha_config_sync.gitignore</code>. This user-managed file persists across add-on updates and is never overwritten when it already exists. The add-on treats the configuration directory as a read-only source tree and stores Git metadata only inside its persistent <code>/data</code> area. The editor shows 15 lines and scrolls for longer rule sets.</p>
   {secrets_warning}
   <p><strong>Security:</strong> Keep <code>secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
-  <form method="post" action="save">
-    <textarea name="gitignore" rows="15" spellcheck="false" aria-label="Git ignore rules">{rules}</textarea>
-    <button type="submit">Save ignore rules</button>
+  <form id="gitignore-form">
+    <textarea id="gitignore" name="gitignore" rows="15" spellcheck="false" aria-label="Git ignore rules">{rules}</textarea>
+    <button id="save-button" type="submit">Save ignore rules</button>
+    <div id="save-status" aria-live="polite"></div>
   </form>
   <form method="post" action="clear-cache" onsubmit="return confirm('Clear the local Git cache? Unpushed local commits will be discarded. The next sync will download the repository again.');">
     <button class="danger-button" type="submit">Clear local Git cache</button>
@@ -111,6 +115,38 @@ PAGE = """<!doctype html>
     <pre>{sync_log_preview}</pre>
   </section>
 </section></main>
+<script>
+  const form = document.getElementById("gitignore-form");
+  const editor = document.getElementById("gitignore");
+  const button = document.getElementById("save-button");
+  const status = document.getElementById("save-status");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const rules = editor.value;
+    button.disabled = true;
+    status.className = "notice";
+    status.textContent = `Saving ${rules.length} characters…`;
+    try {
+      const response = await fetch("save-json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gitignore: rules }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || `HTTP ${response.status}`);
+      }
+      editor.value = result.rules;
+      status.className = "notice";
+      status.textContent = `Saved ${result.bytes} bytes.`;
+    } catch (error) {
+      status.className = "error";
+      status.textContent = `Save failed: ${error.message}`;
+    } finally {
+      button.disabled = false;
+    }
+  });
+</script>
 </body></html>"""
 
 
@@ -318,12 +354,21 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path.rstrip("/")
-        if path == "/save":
-            length = int(self.headers.get("Content-Length", "0"))
-            payload = self.rfile.read(length).decode("utf-8")
-            rules = parse_qs(payload, keep_blank_values=True).get("gitignore", [""])[0]
+        if path == "/save-json":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                payload = self.rfile.read(length)
+                data = json.loads(payload.decode("utf-8"))
+                rules = data.get("gitignore")
+                if not isinstance(rules, str):
+                    raise ValueError("gitignore must be a string")
+            except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as error:
+                debug_log(f"editor JSON request rejected: {error}")
+                self.send_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(error)})
+                return
+
             rules = rules.rstrip("\n") + "\n" if rules else ""
-            debug_log(f"editor save requested: {len(rules)} bytes to {GITIGNORE_FILE}")
+            debug_log(f"editor JSON save requested: {len(rules)} bytes to {GITIGNORE_FILE}")
             try:
                 GITIGNORE_FILE.write_text(rules, encoding="utf-8")
                 GITIGNORE_FILE.chmod(0o600)
@@ -331,16 +376,24 @@ class Handler(BaseHTTPRequestHandler):
                 if persisted != rules:
                     raise OSError("verification read did not match saved content")
             except OSError as error:
-                debug_log(f"editor save failed: {error}")
-                self.send_response(HTTPStatus.SEE_OTHER)
-                self.send_header("Location", "./?save-error=1")
-                self.end_headers()
+                debug_log(f"editor JSON save failed: {error}")
+                self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": str(error)})
                 return
-            debug_log(f"editor save completed: {len(rules)} bytes persisted to {GITIGNORE_FILE}")
+
+            debug_log(f"editor JSON save completed: {len(rules)} bytes persisted to {GITIGNORE_FILE}")
+            self.send_json(HTTPStatus.OK, {"ok": True, "bytes": len(rules.encode("utf-8")), "rules": persisted})
+            return
+
+        if path == "/save":
+            # Keep a diagnostic response for an old cached web UI. The old
+            # form submission route was observed to lose textarea content
+            # behind ingress, so it intentionally no longer writes a file.
+            debug_log("legacy form save rejected; client must reload the Web UI to use JSON save")
             self.send_response(HTTPStatus.SEE_OTHER)
-            self.send_header("Location", "./?saved=1")
+            self.send_header("Location", "./?save-error=1")
             self.end_headers()
             return
+
         if path == "/clear-cache":
             debug_log("local Git cache clear requested")
             try:
@@ -353,6 +406,14 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         self.send_error(HTTPStatus.NOT_FOUND)
+
+    def send_json(self, status: HTTPStatus, data: dict) -> None:
+        content = json.dumps(data).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
 
     def log_message(self, _format, *_args):
         pass

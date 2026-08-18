@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.5.1
+
+- Replaced the Git Ignore Editor’s form submission with a JSON save API to prevent ingress from dropping multi-line textarea content.
+- The editor now shows the exact character count while saving and confirms the byte count returned after server-side verification.
+
 ## 3.5.0
 
 - Corrected Home Assistant mount paths: the Home Assistant configuration source is `/homeassistant`, while the persistent add-on configuration folder is `/config`.
