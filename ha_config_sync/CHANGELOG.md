@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.1.1
+
+- Fixed initialization of the isolated Git metadata directory on first startup.
+
 ## 3.1.0
 
 - Added a safe direct `/config` source-tree mode: Git metadata and indexes are isolated under `/data`, while `/config` is treated as read-only.

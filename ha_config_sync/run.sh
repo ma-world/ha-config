@@ -182,7 +182,7 @@ sync_configuration() {
 
   mkdir -p "${GIT_DIR}"
   if [[ ! -f "${GIT_DIR}/HEAD" ]]; then
-    GIT_DIR="${GIT_DIR}" git init --bare --initial-branch="${branch}"
+    git init --bare --initial-branch="${branch}" "${GIT_DIR}"
     GIT_DIR="${GIT_DIR}" git remote add origin "${repository_url}"
   else
     GIT_DIR="${GIT_DIR}" git remote set-url origin "${repository_url}"
