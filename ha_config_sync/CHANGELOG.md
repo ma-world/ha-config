@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.1.3
+
+- Fixed recovery for existing isolated Git metadata directories that were missing the `origin` remote.
+
 ## 3.1.2
 
 - Fixed an s6 environment conflict caused by assigning the reserved `GIT_DIR` environment variable.

@@ -184,9 +184,14 @@ sync_configuration() {
   mkdir -p "${GIT_METADATA_DIR}"
   if [[ ! -f "${GIT_METADATA_DIR}/HEAD" ]]; then
     git init --bare --initial-branch="${branch}" "${GIT_METADATA_DIR}"
-    git --git-dir="${GIT_METADATA_DIR}" remote add origin "${repository_url}"
-  else
+  fi
+
+  # A previous add-on version may have created the bare metadata directory
+  # before the origin remote was added. Ensure origin exists on every run.
+  if git --git-dir="${GIT_METADATA_DIR}" remote get-url origin >/dev/null 2>&1; then
     git --git-dir="${GIT_METADATA_DIR}" remote set-url origin "${repository_url}"
+  else
+    git --git-dir="${GIT_METADATA_DIR}" remote add origin "${repository_url}"
   fi
 
   git --git-dir="${GIT_METADATA_DIR}" config user.name "${git_name}"
