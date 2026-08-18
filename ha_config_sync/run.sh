@@ -57,9 +57,9 @@ GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 }
 
-# The user-managed ignore file lives in Home Assistant's mounted add-on
-# configuration directory (/config). Never replace an existing file: defaults
-# are created only once when the file does not exist.
+# The user-managed ignore file lives in the Home Assistant add-on config
+# folder. The Supervisor maps it explicitly into this container at /config.
+# Never replace an existing file: defaults are created only once when absent.
 if [[ ! -d "${CONFIG_DIR}" ]]; then
   bashio::log.fatal "Home Assistant configuration directory is not mounted: ${CONFIG_DIR}."
   exit 1

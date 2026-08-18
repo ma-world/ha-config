@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.7.0
+
+- Corrected the visible add-on configuration path in the UI and documentation to `/addon_configs/080264f0_ha_config_sync/gitignore`.
+- Explicitly maps the persistent `addon_config` folder to `/config` inside the container, ensuring the editor and sync process use the same file users edit outside the container.
+
 ## 3.6.1
 
 - Fixed the Diagnostics Web UI crash by restoring the missing Python `json` import.

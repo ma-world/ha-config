@@ -97,7 +97,7 @@ PAGE = """<!doctype html>
   <section class="logs">
     <h2>Git ignore file</h2>
     <p>Edit this user-managed file directly with File Editor or Studio Code Server:</p>
-    <pre>/config/gitignore</pre>
+    <pre>/addon_configs/080264f0_ha_config_sync/gitignore</pre>
     <p>The add-on reads this file during every sync and never overwrites an existing file. The current content is shown below.</p>
     <pre>{rules}</pre>
   </section>
