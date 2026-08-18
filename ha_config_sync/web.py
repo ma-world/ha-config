@@ -41,6 +41,8 @@ PAGE = """<!doctype html>
     .metadata { color: #5e6b76; font-size: .9rem; white-space: nowrap; }
     a { color: #0288d1; }
     p { line-height: 1.5; }
+    .repository-link { display: inline-block; margin: 0 0 16px; padding: 9px 14px; border-radius: 5px; background: #37474f; color: #fff; font-weight: 700; text-decoration: none; }
+    .repository-link:hover { background: #455a64; }
     textarea { box-sizing: border-box; display: block; width: 100%; min-height: 24em; resize: vertical; overflow-y: auto; padding: 12px; border: 1px solid #89939e; border-radius: 6px; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
     button { margin-top: 16px; padding: 10px 18px; border: 0; border-radius: 5px; background: #03a9f4; color: #fff; font-weight: 700; cursor: pointer; }
     .notice { padding: 10px 12px; border-radius: 6px; background: #d9f5e5; color: #095a31; }
@@ -50,7 +52,7 @@ PAGE = """<!doctype html>
     .status-label { display: block; font-size: .85rem; color: #5e6b76; }
     .status-value { display: block; margin-top: 4px; font-weight: 700; }
     code { background: #e8ebef; padding: 2px 4px; border-radius: 3px; }
-    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .warning { background: #4a3612; color: #ffe2a3; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } code { background: #343d46; } }
+    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .warning { background: #4a3612; color: #ffe2a3; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } .repository-link { background: #455a64; color: #fff; } .repository-link:hover { background: #546e7a; } code { background: #343d46; } }
   </style>
 </head>
 <body>
@@ -64,6 +66,7 @@ PAGE = """<!doctype html>
     <div class="status-item"><span class="status-label">Last check</span><span class="status-value">{last_check}</span></div>
     <div class="status-item"><span class="status-label">Last commit with changes</span><span class="status-value">{last_commit}</span></div>
   </div>
+  {backup_repository_link}
   <p>These rules are copied to <code>.gitignore</code> in the private backup repository before every sync. The editor shows 15 lines and scrolls for longer rule sets.</p>
   {secrets_warning}
   <p><strong>Security:</strong> Keep <code>homeassistant/secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
@@ -78,6 +81,34 @@ PAGE = """<!doctype html>
 def html_escape(value: str) -> str:
     return (value.replace("&", "&amp;").replace("<", "&lt;")
                  .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def backup_repository_url() -> str | None:
+    try:
+        output = subprocess.check_output(
+            ["git", "-C", str(REPOSITORY_DIR), "remote", "get-url", "origin"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+    if output.startswith("https://github.com/"):
+        return output.removesuffix(".git").rstrip("/")
+    if output.startswith("git@github.com:"):
+        return "https://github.com/" + output.removeprefix("git@github.com:").removesuffix(".git")
+    if output.startswith("ssh://git@github.com/"):
+        return "https://github.com/" + output.removeprefix("ssh://git@github.com/").removesuffix(".git")
+    return None
+
+
+def backup_repository_link() -> str:
+    url = backup_repository_url()
+    if not url:
+        return ""
+    safe_url = html_escape(url)
+    return (f'<a class="repository-link" href="{safe_url}" target="_blank" '
+            f'rel="noopener noreferrer">Open private backup repository</a>')
 
 
 def repository_gitignore() -> str | None:
@@ -188,6 +219,7 @@ class Handler(BaseHTTPRequestHandler):
         rules = read_rules()
         page = (PAGE.replace("{notice}", message)
                      .replace("{secrets_warning}", secrets_warning(rules))
+                     .replace("{backup_repository_link}", backup_repository_link())
                      .replace("{rules}", html_escape(rules))
                      .replace("{last_check}", html_escape(status["last_check"]))
                      .replace("{last_commit}", html_escape(status["last_commit"]))

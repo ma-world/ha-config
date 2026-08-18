@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 1.8.0
+
+- Added an **Open private backup repository** button to the Git Ignore Editor when a GitHub backup remote is configured.
+
 ## 1.7.4
 
 - Updated the displayed add-on repository maintainer to `ma-world`.
