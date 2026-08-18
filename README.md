@@ -31,7 +31,7 @@ Runtime data, databases, logs, authentication data, tokens, and `secrets.yaml` a
 
 ## Changing the interval or Git ignore rules
 
-Open the **HA Config Sync** app page to change `sync_interval_hours`. To edit Git ignore rules, select **Open Web UI** on the same app page; saving there takes effect on the next sync without restarting the add-on. The Web UI also shows the most recent sync check, the timestamp of the latest commit in the local backup checkout, and an **Open private backup repository** button when a GitHub backup remote is configured. The configured ignore rules apply only to files in the backup repository.
+Open the **HA Config Sync** app page to change `sync_interval_hours`. To edit Git ignore rules, select **Open Web UI** on the same app page; saving there takes effect on the next sync without restarting the add-on. The Web UI also shows the most recent sync check, the timestamp of the latest commit in the local backup checkout, and an **Open private backup repository** button when a GitHub backup remote is configured. Use **Clear local Git cache** to discard the local clone and any unpushed local commits; the next sync downloads the backup repository again. The configured ignore rules apply only to files in the backup repository.
 
 > **Security note:** Keep `homeassistant/secrets.yaml` in `gitignore` unless you fully understand the implications and use a private repository. Git ignore rules do not remove files that were committed previously; remove those files and their history separately if needed.
 

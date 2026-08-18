@@ -162,6 +162,20 @@ write_gitignore() {
   cp "${GITIGNORE_FILE}" "${gitignore_path}"
 }
 
+remove_now_ignored_files() {
+  # Files that were already committed remain tracked even after adding a
+  # .gitignore rule. Remove them from the index and working copy so the next
+  # commit stops attempting to push old, unwanted data.
+  local tracked_file
+  while IFS= read -r tracked_file; do
+    if git -C "${WORK_DIR}" check-ignore -q -- "${tracked_file}"; then
+      git -C "${WORK_DIR}" rm -r --cached --ignore-unmatch -- "${tracked_file}"
+      rm -rf "${WORK_DIR}/${tracked_file}"
+      bashio::log.info "Removed newly ignored path from local Git cache: ${tracked_file}"
+    fi
+  done < <(git -C "${WORK_DIR}" ls-files --cached -- homeassistant)
+}
+
 initialize_empty_remote_repository() {
   if git -C "${WORK_DIR}" show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
     return 0
@@ -247,6 +261,7 @@ sync_configuration() {
     copy_path '.storage/lovelace_dashboards'
   fi
 
+  remove_now_ignored_files
   git -C "${WORK_DIR}" add -A -- homeassistant
   # Stage the user-managed ignore file when it exists and stage its deletion
   # when the editor was intentionally cleared.

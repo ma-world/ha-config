@@ -2,6 +2,13 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 1.9.0
+
+- Added default ignore rules for common large media, archive, ESPHome build, and Zigbee2MQTT database/log files.
+- Made the editor show the active repository `.gitignore` after synchronization, preventing stale editor values from overwriting it.
+- Added **Clear local Git cache** to discard local cloned data and unpushed commits; the next sync downloads the backup repository again.
+- Automatically removes files from the local Git index when they become ignored, so old tracked data is no longer retried for push.
+
 ## 1.8.0
 
 - Added an **Open private backup repository** button to the Git Ignore Editor when a GitHub backup remote is configured.

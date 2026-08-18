@@ -23,6 +23,14 @@ homeassistant/.storage/*
 
 # Credentials are excluded unless you deliberately change this rule
 homeassistant/secrets.yaml
+
+# Large generated or media files that can cause slow Git pushes
+homeassistant/www/**/*.mp4
+homeassistant/www/**/*.zip
+homeassistant/www/**/*.tar
+homeassistant/esphome/.esphome/
+homeassistant/zigbee2mqtt/database.db*
+homeassistant/zigbee2mqtt/logs/
 """
 
 PAGE = """<!doctype html>
@@ -44,7 +52,9 @@ PAGE = """<!doctype html>
     .repository-link { display: inline-block; margin: 0 0 16px; padding: 9px 14px; border-radius: 5px; background: #37474f; color: #fff; font-weight: 700; text-decoration: none; }
     .repository-link:hover { background: #455a64; }
     textarea { box-sizing: border-box; display: block; width: 100%; min-height: 24em; resize: vertical; overflow-y: auto; padding: 12px; border: 1px solid #89939e; border-radius: 6px; font: 14px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    button { margin-top: 16px; padding: 10px 18px; border: 0; border-radius: 5px; background: #03a9f4; color: #fff; font-weight: 700; cursor: pointer; }
+    button { margin-top: 16px; margin-right: 8px; padding: 10px 18px; border: 0; border-radius: 5px; background: #03a9f4; color: #fff; font-weight: 700; cursor: pointer; }
+    .danger-button { background: #c62828; }
+    .danger-button:hover { background: #b71c1c; }
     .notice { padding: 10px 12px; border-radius: 6px; background: #d9f5e5; color: #095a31; }
     .warning { padding: 10px 12px; border-radius: 6px; background: #fff1c2; color: #6a4600; line-height: 1.5; }
     .status { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 16px 0; }
@@ -52,7 +62,7 @@ PAGE = """<!doctype html>
     .status-label { display: block; font-size: .85rem; color: #5e6b76; }
     .status-value { display: block; margin-top: 4px; font-weight: 700; }
     code { background: #e8ebef; padding: 2px 4px; border-radius: 3px; }
-    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .warning { background: #4a3612; color: #ffe2a3; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } .repository-link { background: #455a64; color: #fff; } .repository-link:hover { background: #546e7a; } code { background: #343d46; } }
+    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .warning { background: #4a3612; color: #ffe2a3; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } .repository-link { background: #455a64; color: #fff; } .repository-link:hover { background: #546e7a; } .danger-button { background: #c62828; } .danger-button:hover { background: #b71c1c; } code { background: #343d46; } }
   </style>
 </head>
 <body>
@@ -73,6 +83,9 @@ PAGE = """<!doctype html>
   <form method="post" action="save">
     <textarea name="gitignore" rows="15" spellcheck="false" aria-label="Git ignore rules">{rules}</textarea>
     <button type="submit">Save ignore rules</button>
+  </form>
+  <form method="post" action="clear-cache" onsubmit="return confirm('Clear the local Git cache? Unpushed local commits will be discarded. The next sync will download the repository again.');">
+    <button class="danger-button" type="submit">Clear local Git cache</button>
   </form>
 </section></main>
 </body></html>"""
@@ -120,24 +133,29 @@ def repository_gitignore() -> str | None:
 
 
 def read_rules() -> str:
-    # An empty editor file was created by older releases during migration.
-    # Treat it as uninitialized and recover the existing repository rules or
-    # secure defaults instead of showing an empty editor.
+    # The repository copy is authoritative after a sync. This ensures the UI
+    # shows exactly the .gitignore Git is currently using, rather than a stale
+    # editor cache from an earlier add-on version.
+    repository_rules = repository_gitignore()
+    if repository_rules is not None:
+        if not GITIGNORE_FILE.exists() or GITIGNORE_FILE.read_text(encoding="utf-8") != repository_rules:
+            GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            GITIGNORE_FILE.write_text(repository_rules, encoding="utf-8")
+            GITIGNORE_FILE.chmod(0o600)
+        return repository_rules
+
     try:
         saved_rules = GITIGNORE_FILE.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        saved_rules = None
-    except OSError:
-        saved_rules = None
+    except (FileNotFoundError, OSError):
+        saved_rules = ""
 
-    if saved_rules and saved_rules.strip():
+    if saved_rules.strip():
         return saved_rules
 
-    rules = repository_gitignore() or DEFAULT_RULES
     GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    GITIGNORE_FILE.write_text(rules, encoding="utf-8")
+    GITIGNORE_FILE.write_text(DEFAULT_RULES, encoding="utf-8")
     GITIGNORE_FILE.chmod(0o600)
-    return rules
+    return DEFAULT_RULES
 
 
 def git_last_commit() -> str | None:
@@ -232,18 +250,29 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(page.encode("utf-8"))
 
     def do_POST(self):
-        if urlparse(self.path).path.rstrip("/") != "/save":
-            self.send_error(HTTPStatus.NOT_FOUND)
+        path = urlparse(self.path).path.rstrip("/")
+        if path == "/save":
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = self.rfile.read(length).decode("utf-8")
+            rules = parse_qs(payload, keep_blank_values=True).get("gitignore", [""])[0]
+            GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            GITIGNORE_FILE.write_text(rules.rstrip("\n") + "\n" if rules else "", encoding="utf-8")
+            GITIGNORE_FILE.chmod(0o600)
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "./?saved=1")
+            self.end_headers()
             return
-        length = int(self.headers.get("Content-Length", "0"))
-        payload = self.rfile.read(length).decode("utf-8")
-        rules = parse_qs(payload, keep_blank_values=True).get("gitignore", [""])[0]
-        GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        GITIGNORE_FILE.write_text(rules.rstrip("\n") + "\n" if rules else "", encoding="utf-8")
-        GITIGNORE_FILE.chmod(0o600)
-        self.send_response(HTTPStatus.SEE_OTHER)
-        self.send_header("Location", "./?saved=1")
-        self.end_headers()
+        if path == "/clear-cache":
+            try:
+                import shutil
+                shutil.rmtree(REPOSITORY_DIR)
+            except FileNotFoundError:
+                pass
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "./?cache-cleared=1")
+            self.end_headers()
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
 
     def log_message(self, _format, *_args):
         pass
