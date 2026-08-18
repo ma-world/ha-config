@@ -10,7 +10,8 @@ import subprocess
 from urllib.parse import parse_qs, urlparse
 
 CONFIG_DIR = Path("/homeassistant")
-GITIGNORE_FILE = Path("/data/gitignore")
+ADDON_CONFIG_DIR = Path("/config")
+GITIGNORE_FILE = ADDON_CONFIG_DIR / "gitignore"
 STATUS_FILE = Path("/data/sync-status.json")
 WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")
 SYNC_DEBUG_LOG = Path("/data/sync-debug.log")
@@ -94,8 +95,7 @@ PAGE = """<!doctype html>
     <h2>Active Git ignore rules</h2>
     <p>Edit this persistent user-managed file with File Editor or Studio Code Server:</p>
     <pre>{host_gitignore_path}</pre>
-    <p>{addon_config_mount_status}</p>
-    <p>This read-only preview shows the exact rules currently applied during synchronization.</p>
+    <p>Inside the add-on container, this same file is mounted at <code>/config/gitignore</code>. This read-only preview shows the exact rules currently applied during synchronization.</p>
     <pre>{rules}</pre>
   </section>
   <form method="post" action="clear-cache" onsubmit="return confirm('Clear the local Git cache? Unpushed local commits will be discarded. The next sync will download the repository again.');">
@@ -163,22 +163,11 @@ def html_escape(value: str) -> str:
                  .replace(">", "&gt;").replace('"', "&quot;"))
 
 
-def addon_config_mount_status() -> str:
-    if not Path("/config").is_dir():
-        return "Diagnostic mode: /config is not mounted in this container. The active rules still use /data/gitignore."
-    try:
-        entries = ", ".join(sorted(child.name for child in Path("/config").iterdir())) or "(empty)"
-    except OSError as error:
-        entries = f"unreadable: {error}"
-    return f"Diagnostic mode: /config is mounted. Entries: {entries}. The active rules still use /data/gitignore until the mount is verified."
-
-
 def host_gitignore_path() -> str:
-    try:
-        configured_path = json.loads(OPTIONS_FILE.read_text(encoding="utf-8")).get("gitignore_host_path", "")
-    except (FileNotFoundError, ValueError):
-        configured_path = ""
-    return configured_path or "Not configured"
+    # The Supervisor mount diagnostics identify the host directory as
+    # /supervisor/app_configs/080264f0_ha_config_sync. Studio Code exposes the
+    # same directory through /addon_configs/080264f0_ha_config_sync.
+    return "/addon_configs/080264f0_ha_config_sync/gitignore"
 
 
 def backup_repository_url() -> str | None:
@@ -322,7 +311,6 @@ class Handler(BaseHTTPRequestHandler):
                      .replace("{backup_repository_link}", backup_repository_link())
                      .replace("{rules}", html_escape(rules))
                      .replace("{host_gitignore_path}", html_escape(host_gitignore_path()))
-                     .replace("{addon_config_mount_status}", html_escape(addon_config_mount_status()))
                      .replace("{last_check}", html_escape(status["last_check"]))
                      .replace("{last_commit}", html_escape(status["last_commit"]))
                      .replace("{sync_log_preview}", html_escape(read_log(SYNC_DEBUG_LOG)))

@@ -8,8 +8,9 @@ readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
 readonly SYNC_DEBUG_LOG=/data/sync-debug.log
 readonly OPTIONS_FILE=/data/options.json
-readonly ADDON_CONFIG_MOUNT=/config
-readonly GITIGNORE_FILE=/data/gitignore
+readonly ADDON_CONFIG_DIR=/config
+readonly GITIGNORE_FILE="${ADDON_CONFIG_DIR}/gitignore"
+readonly LEGACY_GITIGNORE_FILE=/data/gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
 
 repository_url="$(bashio::config 'repository_url')"
@@ -18,7 +19,6 @@ git_name="$(bashio::config 'git_name')"
 git_email="$(bashio::config 'git_email')"
 github_token="$(bashio::config 'github_token')"
 sync_interval_hours="$(bashio::config 'sync_interval_hours')"
-gitignore_host_path="$(bashio::config 'gitignore_host_path')"
 
 if [[ -z "${repository_url}" ]]; then
   bashio::log.fatal 'repository_url must be configured.'
@@ -59,10 +59,18 @@ GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 }
 
-# The user-managed ignore file is stored in persistent add-on data. The web
-# interface uses the Supervisor-provided slug from options.json to display a
-# portable host-side add-on configuration path for every installation.
-if [[ ! -e "${GITIGNORE_FILE}" ]]; then
+# The user-managed ignore file is stored in the Supervisor-managed add-on
+# configuration folder. It is shared with the host-visible path documented in
+# the Web UI and is never overwritten when it already exists.
+if [[ ! -d "${ADDON_CONFIG_DIR}" ]]; then
+  bashio::log.fatal "Add-on configuration directory is not mounted: ${ADDON_CONFIG_DIR}."
+  exit 1
+fi
+if [[ ! -e "${GITIGNORE_FILE}" && -f "${LEGACY_GITIGNORE_FILE}" ]]; then
+  cp "${LEGACY_GITIGNORE_FILE}" "${GITIGNORE_FILE}"
+  chmod 600 "${GITIGNORE_FILE}"
+  bashio::log.info "Migrated existing Git ignore rules from ${LEGACY_GITIGNORE_FILE} to ${GITIGNORE_FILE}."
+elif [[ ! -e "${GITIGNORE_FILE}" ]]; then
   bashio::log.warning "Git ignore file not found; creating defaults at ${GITIGNORE_FILE}."
   create_default_gitignore
 elif [[ ! -f "${GITIGNORE_FILE}" ]]; then
@@ -140,10 +148,10 @@ log_mount_diagnostics() {
       debug_log "container directory ${path}: missing"
     fi
   done
-  if [[ -d "${ADDON_CONFIG_MOUNT}" ]]; then
-    debug_log "addon_config diagnostic: mount candidate is available at ${ADDON_CONFIG_MOUNT}; active ignore remains ${GITIGNORE_FILE} during this diagnostic release"
+  if [[ -d "${ADDON_CONFIG_DIR}" ]]; then
+    debug_log "addon_config mount is available at ${ADDON_CONFIG_DIR}; active ignore file=${GITIGNORE_FILE}"
   else
-    debug_log "addon_config diagnostic: mount candidate ${ADDON_CONFIG_MOUNT} is unavailable; active ignore remains ${GITIGNORE_FILE}"
+    debug_log "addon_config mount is unavailable at ${ADDON_CONFIG_DIR}"
   fi
 
   debug_log "options file: ${OPTIONS_FILE}"
@@ -155,7 +163,6 @@ log_mount_diagnostics() {
     debug_log "configured git_name: ${git_name}"
     debug_log "configured git_email: ${git_email}"
     debug_log 'github_token: [configured; value not logged]'
-    debug_log "configured gitignore host path: ${gitignore_host_path}"
   else
     debug_log 'options file is not readable'
   fi
@@ -267,7 +274,7 @@ rebuild_index_from_config() {
 }
 
 sync_configuration() {
-  debug_log "sync started; repository=${repository_url}; branch=${branch}; active_ignore_file=${GITIGNORE_FILE}; addon_config_candidate=${ADDON_CONFIG_MOUNT}"
+  debug_log "sync started; repository=${repository_url}; branch=${branch}; active_ignore_file=${GITIGNORE_FILE}"
   write_status last_check
   if ! verify_private_repository; then
     debug_log 'sync stopped: private repository verification failed'

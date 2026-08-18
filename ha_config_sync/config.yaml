@@ -1,5 +1,5 @@
 name: HA Config Sync
-version: "4.2.0"
+version: "4.3.0"
 slug: ha_config_sync
 description: Backs up Home Assistant configuration to Git. Open Web UI for status, active rule preview, logs, cache reset, and the repository link.
 url: https://github.com/ma-world/ha-config
@@ -30,7 +30,6 @@ options:
   include_secrets: false
   include_dashboards: true
   sync_interval_hours: 4
-  gitignore_host_path: /addon_configs/080264f0_ha_config_sync/gitignore
 schema:
   repository_url: str
   branch: str
@@ -40,4 +39,3 @@ schema:
   include_secrets: bool
   include_dashboards: bool
   sync_interval_hours: int(1,168)
-  gitignore_host_path: str

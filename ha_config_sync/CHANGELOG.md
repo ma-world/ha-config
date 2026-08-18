@@ -2,6 +2,12 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.3.0
+
+- Completed the verified `addon_config` migration: the active Git ignore file is now `/config/gitignore` in the container, shared with `/addon_configs/080264f0_ha_config_sync/gitignore` on the host.
+- Added a one-time migration from legacy `/data/gitignore` only when the shared add-on-config file does not already exist.
+- The Web UI and sync process now read the same shared file.
+
 ## 4.2.0
 
 - Enabled `addon_config:rw` for an internal diagnostic iteration.
