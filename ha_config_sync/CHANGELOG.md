@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.6.1
+
+- Fixed the Diagnostics Web UI crash by restoring the missing Python `json` import.
+
 ## 3.6.0
 
 - Removed the unreliable ingress-based Git Ignore Editor save operation.
