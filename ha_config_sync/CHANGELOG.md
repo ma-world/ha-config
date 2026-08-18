@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.1.2
+
+- Fixed an s6 environment conflict caused by assigning the reserved `GIT_DIR` environment variable.
+- All Git commands now use explicit `--git-dir` and `--work-tree` arguments instead of setting `GIT_DIR` in the process environment.
+
 ## 3.1.1
 
 - Fixed initialization of the isolated Git metadata directory on first startup.

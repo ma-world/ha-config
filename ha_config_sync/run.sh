@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 readonly CONFIG_DIR=/config
-readonly GIT_DIR=/data/git
+readonly GIT_METADATA_DIR=/data/git
 readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
 readonly GITIGNORE_FILE=/config/ha_config_sync.gitignore
@@ -86,10 +86,11 @@ safe_git() {
   # Git metadata and the transient index live in /data. /config is used only
   # as a read-only source tree. Do not add reset, clean, checkout, restore, or
   # any worktree-mutating command to this add-on.
-  GIT_DIR="${GIT_DIR}" \
-  GIT_WORK_TREE="${CONFIG_DIR}" \
   GIT_INDEX_FILE="${INDEX_FILE}" \
-  git "$@"
+  GIT_CONFIG_COUNT=1 \
+  GIT_CONFIG_KEY_0=core.excludesfile \
+  GIT_CONFIG_VALUE_0="${GITIGNORE_FILE}" \
+  git --git-dir="${GIT_METADATA_DIR}" --work-tree="${CONFIG_DIR}" "$@"
 }
 
 write_status() {
@@ -172,7 +173,7 @@ rebuild_index_from_config() {
   # The original file remains in /config and is ignored by its own rules.
   mkdir -p "${SNAPSHOT_DIR}"
   cp "${GITIGNORE_FILE}" "${SNAPSHOT_DIR}/ha_config_sync.gitignore.backup"
-  GIT_DIR="${GIT_DIR}" GIT_INDEX_FILE="${INDEX_FILE}" git add -f "${SNAPSHOT_DIR}/ha_config_sync.gitignore.backup" 2>/dev/null || true
+  GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" --work-tree="${SNAPSHOT_DIR}" add -f ha_config_sync.gitignore.backup 2>/dev/null || true
   rm -f "${SNAPSHOT_DIR}/ha_config_sync.gitignore.backup"
 }
 
@@ -180,24 +181,24 @@ sync_configuration() {
   write_status last_check
   verify_private_repository || return 1
 
-  mkdir -p "${GIT_DIR}"
-  if [[ ! -f "${GIT_DIR}/HEAD" ]]; then
-    git init --bare --initial-branch="${branch}" "${GIT_DIR}"
-    GIT_DIR="${GIT_DIR}" git remote add origin "${repository_url}"
+  mkdir -p "${GIT_METADATA_DIR}"
+  if [[ ! -f "${GIT_METADATA_DIR}/HEAD" ]]; then
+    git init --bare --initial-branch="${branch}" "${GIT_METADATA_DIR}"
+    git --git-dir="${GIT_METADATA_DIR}" remote add origin "${repository_url}"
   else
-    GIT_DIR="${GIT_DIR}" git remote set-url origin "${repository_url}"
+    git --git-dir="${GIT_METADATA_DIR}" remote set-url origin "${repository_url}"
   fi
 
-  GIT_DIR="${GIT_DIR}" git config user.name "${git_name}"
-  GIT_DIR="${GIT_DIR}" git config user.email "${git_email}"
+  git --git-dir="${GIT_METADATA_DIR}" config user.name "${git_name}"
+  git --git-dir="${GIT_METADATA_DIR}" config user.email "${git_email}"
 
-  if ! GIT_DIR="${GIT_DIR}" git fetch --prune origin "${branch}"; then
+  if ! git --git-dir="${GIT_METADATA_DIR}" fetch --prune origin "${branch}"; then
     bashio::log.warning 'Remote branch could not be fetched; the next run will retry.'
     return 1
   fi
 
-  if GIT_DIR="${GIT_DIR}" git show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
-    GIT_DIR="${GIT_DIR}" git update-ref "refs/heads/${branch}" "refs/remotes/origin/${branch}"
+  if git --git-dir="${GIT_METADATA_DIR}" show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
+    git --git-dir="${GIT_METADATA_DIR}" update-ref "refs/heads/${branch}" "refs/remotes/origin/${branch}"
   else
     initialize_empty_remote_repository || return 1
   fi
@@ -205,9 +206,9 @@ sync_configuration() {
   rebuild_index_from_config
 
   local parent_tree parent_commit new_tree commit_message new_commit
-  parent_commit="$(GIT_DIR="${GIT_DIR}" git rev-parse "refs/heads/${branch}")"
-  parent_tree="$(GIT_DIR="${GIT_DIR}" git rev-parse "${parent_commit}^{tree}")"
-  new_tree="$(GIT_DIR="${GIT_DIR}" GIT_INDEX_FILE="${INDEX_FILE}" git write-tree)"
+  parent_commit="$(git --git-dir="${GIT_METADATA_DIR}" rev-parse "refs/heads/${branch}")"
+  parent_tree="$(git --git-dir="${GIT_METADATA_DIR}" rev-parse "${parent_commit}^{tree}")"
+  new_tree="$(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" write-tree)"
 
   if [[ "${new_tree}" == "${parent_tree}" ]]; then
     bashio::log.info 'No configuration changes to sync.'
@@ -215,10 +216,10 @@ sync_configuration() {
   fi
 
   commit_message="Home Assistant configuration sync $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-  new_commit="$(GIT_DIR="${GIT_DIR}" GIT_INDEX_FILE="${INDEX_FILE}" git commit-tree "${new_tree}" -p "${parent_commit}" -m "${commit_message}")"
-  GIT_DIR="${GIT_DIR}" git update-ref "refs/heads/${branch}" "${new_commit}" "${parent_commit}"
+  new_commit="$(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" commit-tree "${new_tree}" -p "${parent_commit}" -m "${commit_message}")"
+  git --git-dir="${GIT_METADATA_DIR}" update-ref "refs/heads/${branch}" "${new_commit}" "${parent_commit}"
 
-  if ! GIT_DIR="${GIT_DIR}" git push origin "refs/heads/${branch}:refs/heads/${branch}"; then
+  if ! git --git-dir="${GIT_METADATA_DIR}" push origin "refs/heads/${branch}:refs/heads/${branch}"; then
     bashio::log.error 'Configuration commit was created locally, but the push failed. The next scheduled sync will retry.'
     return 1
   fi
