@@ -2,6 +2,13 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.0.0
+
+- Reworked backups to use the mounted Home Assistant `/config` directory directly, removing the intermediate configuration snapshot copy.
+- Moved the editable Git ignore file to `/config/ha_config_sync.gitignore`, where it is directly visible in File Editor and Studio Code Server.
+- Rebuilds the Git index on every sync so newly added ignore rules are applied immediately and stale cached files are not committed.
+- This release focuses on `/config` only; external add-on data such as Zigbee2MQTT and ESPHome is no longer copied by this add-on.
+
 ## 2.0.2
 
 - Fixed persistent Git ignore storage by maintaining a compatibility copy in the add-on `/data` folder and synchronizing it with Home Assistant add-on configuration storage.

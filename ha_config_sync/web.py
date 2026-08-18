@@ -8,34 +8,30 @@ import os
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
-ADDON_CONFIG_DIR = Path("/addon_configs") / os.getenv("HOSTNAME", "ha_config_sync")
-ADDON_CONFIG_GITIGNORE_FILE = ADDON_CONFIG_DIR / "gitignore"
-# Keep the editor state under /data too. This is guaranteed to be writable by
-# every add-on and is synchronized to addon_configs by the sync process.
-GITIGNORE_FILE = Path("/data/gitignore")
+GITIGNORE_FILE = Path("/config/ha_config_sync.gitignore")
 STATUS_FILE = Path("/data/sync-status.json")
 OPTIONS_FILE = Path("/data/options.json")
 REPOSITORY_DIR = Path("/data/repository")
 ADDON_VERSION = os.getenv("ADDON_VERSION", "unknown")
 PROJECT_URL = "https://github.com/ma-world/ha-config"
 DEFAULT_RULES = """# Runtime and generated Home Assistant data
-homeassistant/home-assistant_v2.db*
-homeassistant/*.log
-homeassistant/.storage/*
-!homeassistant/.storage/lovelace
-!homeassistant/.storage/lovelace_dashboards
+home-assistant_v2.db*
+*.log
+.storage/*
+!.storage/lovelace
+!.storage/lovelace_dashboards
 
 # Credentials are excluded unless you deliberately change this rule
-homeassistant/secrets.yaml
+secrets.yaml
 
 # Large generated or media files that can cause slow Git pushes
-homeassistant/www/**/*.mp4
-homeassistant/www/**/*.zip
-homeassistant/www/**/*.tar
-homeassistant/www/community/
-homeassistant/esphome/.esphome/
-homeassistant/zigbee2mqtt/database.db*
-homeassistant/zigbee2mqtt/logs/
+www/**/*.mp4
+www/**/*.zip
+www/**/*.tar
+www/community/
+esphome/.esphome/
+zigbee2mqtt/database.db*
+zigbee2mqtt/logs/
 """
 
 PAGE = """<!doctype html>
@@ -82,9 +78,9 @@ PAGE = """<!doctype html>
     <div class="status-item"><span class="status-label">Last commit with changes</span><span class="status-value">{last_commit}</span></div>
   </div>
   {backup_repository_link}
-  <p>These rules are saved immediately in the add-on's persistent data and synchronized to the Home Assistant add-on configuration folder during the next sync. They are applied before Git commits and are also copied to <code>.gitignore</code> in the private backup repository. The editor shows 15 lines and scrolls for longer rule sets.</p>
+  <p>These rules are saved directly as <code>/config/ha_config_sync.gitignore</code>. The add-on uses the mounted Home Assistant configuration directory directly and applies these rules before Git commits. The editor shows 15 lines and scrolls for longer rule sets.</p>
   {secrets_warning}
-  <p><strong>Security:</strong> Keep <code>homeassistant/secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
+  <p><strong>Security:</strong> Keep <code>secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
   <form method="post" action="save">
     <textarea name="gitignore" rows="15" spellcheck="false" aria-label="Git ignore rules">{rules}</textarea>
     <button type="submit">Save ignore rules</button>
@@ -129,38 +125,16 @@ def backup_repository_link() -> str:
             f'rel="noopener noreferrer">Open private backup repository</a>')
 
 
-def repository_gitignore() -> str | None:
-    path = REPOSITORY_DIR / ".gitignore"
-    try:
-        return path.read_text(encoding="utf-8") if path.is_file() else None
-    except OSError:
-        return None
-
-
 def read_rules() -> str:
-    # The editor cache is authoritative. It is updated immediately when the
-    # user saves, and the sync process copies it into the local Git checkout.
-    # This prevents an old local checkout from overwriting a newer editor value.
     try:
-        saved_rules = GITIGNORE_FILE.read_text(encoding="utf-8")
+        rules = GITIGNORE_FILE.read_text(encoding="utf-8")
     except (FileNotFoundError, OSError):
-        saved_rules = ""
-
-    if saved_rules.strip():
-        return saved_rules
-
-    try:
-        addon_config_rules = ADDON_CONFIG_GITIGNORE_FILE.read_text(encoding="utf-8")
-    except (FileNotFoundError, OSError):
-        addon_config_rules = ""
-
-    repository_rules = repository_gitignore()
-    rules = addon_config_rules or repository_rules or DEFAULT_RULES
-    GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    GITIGNORE_FILE.parent.chmod(0o700)
-    GITIGNORE_FILE.write_text(rules, encoding="utf-8")
+        rules = ""
+    if rules.strip():
+        return rules
+    GITIGNORE_FILE.write_text(DEFAULT_RULES, encoding="utf-8")
     GITIGNORE_FILE.chmod(0o600)
-    return rules
+    return DEFAULT_RULES
 
 
 def git_last_commit() -> str | None:
@@ -196,22 +170,22 @@ def include_secrets_enabled() -> bool:
 
 def secrets_warning(rules: str) -> str:
     secrets_ignored = any(
-        line.strip().lstrip("/") == "homeassistant/secrets.yaml"
+        line.strip().lstrip("/") == "secrets.yaml"
         for line in rules.splitlines()
         if not line.strip().startswith("#")
     )
     if not secrets_ignored and not include_secrets_enabled():
         return ("<p class='warning'><strong>Secrets are still protected.</strong> "
-                "The ignore rule for <code>homeassistant/secrets.yaml</code> was removed, "
+                "The ignore rule for <code>secrets.yaml</code> was removed, "
                 "but <strong>Include secrets</strong> is disabled in the add-on configuration. "
                 "The file will not be copied or committed until you explicitly enable that option.</p>")
     if include_secrets_enabled() and secrets_ignored:
         return ("<p class='warning'><strong>Secrets will not be committed.</strong> "
                 "<strong>Include secrets</strong> is enabled, but "
-                "<code>homeassistant/secrets.yaml</code> is still ignored by these rules.</p>")
+                "<code>secrets.yaml</code> is still ignored by these rules.</p>")
     if include_secrets_enabled() and not secrets_ignored:
         return ("<p class='warning'><strong>Secrets backup is enabled.</strong> "
-                "<code>homeassistant/secrets.yaml</code> can be committed to your private backup repository.</p>")
+                "<code>secrets.yaml</code> can be committed to your private backup repository.</p>")
     return ""
 
 
@@ -239,7 +213,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         query = urlparse(self.path).query
         if "saved=1" in query:
-            message = "<p class=\"notice\">Ignore rules saved locally and applied to the current Git checkout. They will be committed during the next sync.</p>"
+            message = "<p class=\"notice\">Ignore rules saved in /config. They will be applied during the next sync.</p>"
         elif "cache-cleared=1" in query:
             message = "<p class=\"notice\">Local Git cache cleared. The next sync will download the repository again.</p>"
         else:
@@ -267,24 +241,8 @@ class Handler(BaseHTTPRequestHandler):
             payload = self.rfile.read(length).decode("utf-8")
             rules = parse_qs(payload, keep_blank_values=True).get("gitignore", [""])[0]
             rules = rules.rstrip("\n") + "\n" if rules else ""
-            GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            GITIGNORE_FILE.parent.chmod(0o700)
             GITIGNORE_FILE.write_text(rules, encoding="utf-8")
             GITIGNORE_FILE.chmod(0o600)
-            try:
-                ADDON_CONFIG_GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-                ADDON_CONFIG_GITIGNORE_FILE.parent.chmod(0o700)
-                ADDON_CONFIG_GITIGNORE_FILE.write_text(rules, encoding="utf-8")
-                ADDON_CONFIG_GITIGNORE_FILE.chmod(0o600)
-            except OSError:
-                # /data remains the canonical editor location if addon_configs
-                # is temporarily unavailable to the ingress web process.
-                pass
-            # Apply the saved editor content immediately to the local clone as
-            # well. This makes a reload show the saved value even before the
-            # next scheduled synchronization.
-            if REPOSITORY_DIR.is_dir():
-                (REPOSITORY_DIR / ".gitignore").write_text(rules, encoding="utf-8")
             self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "./?saved=1")
             self.end_headers()
