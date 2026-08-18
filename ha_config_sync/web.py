@@ -133,17 +133,9 @@ def repository_gitignore() -> str | None:
 
 
 def read_rules() -> str:
-    # The repository copy is authoritative after a sync. This ensures the UI
-    # shows exactly the .gitignore Git is currently using, rather than a stale
-    # editor cache from an earlier add-on version.
-    repository_rules = repository_gitignore()
-    if repository_rules is not None:
-        if not GITIGNORE_FILE.exists() or GITIGNORE_FILE.read_text(encoding="utf-8") != repository_rules:
-            GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            GITIGNORE_FILE.write_text(repository_rules, encoding="utf-8")
-            GITIGNORE_FILE.chmod(0o600)
-        return repository_rules
-
+    # The editor cache is authoritative. It is updated immediately when the
+    # user saves, and the sync process copies it into the local Git checkout.
+    # This prevents an old local checkout from overwriting a newer editor value.
     try:
         saved_rules = GITIGNORE_FILE.read_text(encoding="utf-8")
     except (FileNotFoundError, OSError):
@@ -152,10 +144,12 @@ def read_rules() -> str:
     if saved_rules.strip():
         return saved_rules
 
+    repository_rules = repository_gitignore()
+    rules = repository_rules or DEFAULT_RULES
     GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    GITIGNORE_FILE.write_text(DEFAULT_RULES, encoding="utf-8")
+    GITIGNORE_FILE.write_text(rules, encoding="utf-8")
     GITIGNORE_FILE.chmod(0o600)
-    return DEFAULT_RULES
+    return rules
 
 
 def git_last_commit() -> str | None:
@@ -255,9 +249,15 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             payload = self.rfile.read(length).decode("utf-8")
             rules = parse_qs(payload, keep_blank_values=True).get("gitignore", [""])[0]
+            rules = rules.rstrip("\n") + "\n" if rules else ""
             GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            GITIGNORE_FILE.write_text(rules.rstrip("\n") + "\n" if rules else "", encoding="utf-8")
+            GITIGNORE_FILE.write_text(rules, encoding="utf-8")
             GITIGNORE_FILE.chmod(0o600)
+            # Apply the saved editor content immediately to the local clone as
+            # well. This makes a reload show the saved value even before the
+            # next scheduled synchronization.
+            if REPOSITORY_DIR.is_dir():
+                (REPOSITORY_DIR / ".gitignore").write_text(rules, encoding="utf-8")
             self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "./?saved=1")
             self.end_headers()

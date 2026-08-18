@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 1.9.1
+
+- Fixed the Git Ignore Editor so saved rules remain authoritative instead of being replaced by an older local checkout.
+- Saving rules now updates the local checkout `.gitignore` immediately, before the next scheduled sync.
+
 ## 1.9.0
 
 - Added default ignore rules for common large media, archive, ESPHome build, and Zigbee2MQTT database/log files.
