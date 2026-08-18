@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.4.2
+
+- Fixed the `homeassistant_config` map by explicitly mounting it at `/config` inside the add-on container.
+
 ## 3.4.1
 
 - Fixed the Home Assistant configuration mount path by using the Supervisor-provided `HOMEASSISTANT_CONFIG` location instead of assuming `/config`.

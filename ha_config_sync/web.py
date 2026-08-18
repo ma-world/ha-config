@@ -8,7 +8,7 @@ import os
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
-CONFIG_DIR = Path(os.getenv("HOMEASSISTANT_CONFIG", "/config"))
+CONFIG_DIR = Path("/config")
 GITIGNORE_FILE = CONFIG_DIR / "ha_config_sync.gitignore"
 STATUS_FILE = Path("/data/sync-status.json")
 WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")

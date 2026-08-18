@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 set -Eeuo pipefail
 
-readonly CONFIG_DIR="${HOMEASSISTANT_CONFIG:-/config}"
+readonly CONFIG_DIR=/config
 readonly GIT_METADATA_DIR=/data/git
 readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
