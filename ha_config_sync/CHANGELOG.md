@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.1.5
+
+- Fixed first-commit creation for an empty private backup repository by ensuring all Git plumbing commands use the isolated Git metadata directory.
+
 ## 3.1.4
 
 - Fixed setup for a new private repository with no branch or commits yet. The add-on now detects and initializes an empty remote repository instead of failing while fetching a missing branch.

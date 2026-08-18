@@ -155,12 +155,16 @@ verify_private_repository() {
 initialize_empty_remote_repository() {
   bashio::log.info "Remote branch '${branch}' does not exist yet; initializing the private backup repository."
   local empty_tree commit
-  empty_tree="$(git mktree </dev/null)"
-  commit="$(git commit-tree "${empty_tree}" -m 'Initialize Home Assistant configuration backup repository')"
-  safe_git update-ref "refs/heads/${branch}" "${commit}"
-  safe_git push --set-upstream origin "refs/heads/${branch}:refs/heads/${branch}"
-  safe_git fetch --prune origin "${branch}"
+  empty_tree="$(git --git-dir="${GIT_METADATA_DIR}" mktree </dev/null)"
+  commit="$(git --git-dir="${GIT_METADATA_DIR}" commit-tree "${empty_tree}" -m 'Initialize Home Assistant configuration backup repository')"
+  git --git-dir="${GIT_METADATA_DIR}" update-ref "refs/heads/${branch}" "${commit}"
+  if ! git --git-dir="${GIT_METADATA_DIR}" push --set-upstream origin "refs/heads/${branch}:refs/heads/${branch}"; then
+    bashio::log.fatal 'Could not push the initial commit to the backup repository.'
+    return 1
+  fi
+  git --git-dir="${GIT_METADATA_DIR}" fetch --prune origin
 }
+
 
 rebuild_index_from_config() {
   # Rebuilding only the index applies ignore changes immediately without
