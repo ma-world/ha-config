@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.0.3
+
+- Added persistent startup mount diagnostics to `/data/sync-debug.log`, including container paths, relevant mountinfo entries, add-on configuration values, and the detected add-on slug.
+- Sensitive GitHub token output is masked in diagnostics.
+
 ## 4.0.2
 
 - Fixed Web UI sync-debug-log links for Home Assistant ingress by using explicit relative paths.

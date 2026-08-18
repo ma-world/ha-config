@@ -117,6 +117,56 @@ debug_log() {
   fi
 }
 
+mask_value() {
+  local value="$1"
+  local length=${#value}
+  if (( length <= 8 )); then
+    printf '%s' '[redacted]'
+  else
+    printf '%s…%s' "${value:0:4}" "${value:length-4:4}"
+  fi
+}
+
+log_mount_diagnostics() {
+  local path option_slug mount_lines
+  debug_log '=== Startup mount diagnostics ==='
+  for path in /homeassistant /config /data; do
+    if [[ -d "${path}" ]]; then
+      debug_log "container directory ${path}: present ($(ls -ld "${path}" 2>/dev/null || true))"
+    else
+      debug_log "container directory ${path}: missing"
+    fi
+  done
+
+  debug_log "options file: ${OPTIONS_FILE}"
+  if [[ -r "${OPTIONS_FILE}" ]]; then
+    option_slug="$(jq -r '.slug // "unknown"' "${OPTIONS_FILE}" 2>/dev/null || printf 'unknown')"
+    debug_log "detected add-on slug: ${option_slug}"
+    debug_log "configured repository_url: ${repository_url}"
+    debug_log "configured branch: ${branch}"
+    debug_log "configured git_name: ${git_name}"
+    debug_log "configured git_email: ${git_email}"
+    debug_log "github_token: $(mask_value "${github_token}")"
+  else
+    debug_log 'options file is not readable'
+  fi
+
+  debug_log 'relevant /proc/self/mountinfo entries:'
+  if [[ -r /proc/self/mountinfo ]]; then
+    mount_lines="$(grep -E ' /homeassistant | /config | /data ' /proc/self/mountinfo || true)"
+    if [[ -n "${mount_lines}" ]]; then
+      while IFS= read -r mount_line; do
+        debug_log "mountinfo: ${mount_line}"
+      done <<< "${mount_lines}"
+    else
+      debug_log 'mountinfo: no entries matched /homeassistant, /config, or /data'
+    fi
+  else
+    debug_log 'mountinfo: /proc/self/mountinfo is not readable'
+  fi
+  debug_log '=== End startup mount diagnostics ==='
+}
+
 write_status() {
   local status_key="$1"
   local timestamp
@@ -277,6 +327,7 @@ sync_configuration() {
 python3 /web.py &
 web_pid=$!
 
+log_mount_diagnostics
 interval_seconds=$((sync_interval_hours * 3600))
 bashio::log.info "Sync starts immediately and repeats every ${sync_interval_hours} hour(s)."
 while true; do

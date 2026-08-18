@@ -107,7 +107,7 @@ PAGE = """<!doctype html>
       <a class="log-link" href="./sync-log">View sync debug log</a>
       <a class="log-link" href="./sync-log?download=1">Download sync debug log</a>
     </div>
-    <h3>Latest sync debug log</h3>
+    <h3>Startup mount diagnostics and latest sync debug log</h3>
     <pre>{sync_log_preview}</pre>
   </section>
 </section></main>
