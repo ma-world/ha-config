@@ -4,14 +4,22 @@ set -Eeuo pipefail
 
 readonly CONFIG_DIR=/config
 readonly WORK_DIR=/data/repository
+readonly SNAPSHOT_DIR="${WORK_DIR}/homeassistant"
+readonly ADDON_SLUG=ha_config_sync
+readonly ADDON_CONFIG_DIR=/addon_configs/${HOSTNAME}
+readonly ADDON_CONFIG_GITIGNORE=${ADDON_CONFIG_DIR}/gitignore
+readonly LEGACY_GITIGNORE_FILE=/data/gitignore
+readonly GITIGNORE_FILE=${ADDON_CONFIG_GITIGNORE}
 readonly STATUS_FILE=/data/sync-status.json
-readonly GITIGNORE_FILE=/config/ha_config_sync.gitignore
+readonly ADDON_OPTIONS_FILE=/data/options.json
 
 repository_url="$(bashio::config 'repository_url')"
 branch="$(bashio::config 'branch')"
 git_name="$(bashio::config 'git_name')"
 git_email="$(bashio::config 'git_email')"
 github_token="$(bashio::config 'github_token')"
+include_secrets="$(bashio::config 'include_secrets')"
+include_dashboards="$(bashio::config 'include_dashboards')"
 sync_interval_hours="$(bashio::config 'sync_interval_hours')"
 
 if [[ -z "${repository_url}" ]]; then
@@ -24,40 +32,48 @@ if ! [[ "${sync_interval_hours}" =~ ^[1-9][0-9]*$ ]] || (( sync_interval_hours >
   exit 1
 fi
 
+# A GitHub token is also used to verify that the configured destination is private.
 if [[ -z "${github_token}" ]]; then
   bashio::log.fatal 'github_token is required to verify that the backup repository is private.'
   exit 1
 fi
 
-create_default_gitignore() {
-  cat >"${GITIGNORE_FILE}" <<'GITIGNORE'
-# Home Assistant runtime and generated data
-home-assistant_v2.db*
-*.log
-.storage/*
-!.storage/lovelace
-!.storage/lovelace_dashboards
+# Persist the ignore rules in Home Assistant's add-on configuration storage.
+# The primary path follows Home Assistant's official addon_config mapping.
+# A compatibility copy is maintained in /data for older installs and for tools
+# that expose only /data to the add-on web process.
+mkdir -p "${ADDON_CONFIG_DIR}"
+chmod 700 "${ADDON_CONFIG_DIR}"
+if [[ ! -f "${ADDON_CONFIG_GITIGNORE}" && -s "${LEGACY_GITIGNORE_FILE}" ]]; then
+  cp "${LEGACY_GITIGNORE_FILE}" "${ADDON_CONFIG_GITIGNORE}"
+fi
+if [[ ! -f "${ADDON_CONFIG_GITIGNORE}" ]]; then
+  cat >"${ADDON_CONFIG_GITIGNORE}" <<'GITIGNORE'
+# Runtime and generated Home Assistant data
+homeassistant/home-assistant_v2.db*
+homeassistant/*.log
+homeassistant/.storage/*
+!homeassistant/.storage/lovelace
+!homeassistant/.storage/lovelace_dashboards
 
 # Credentials are excluded unless you deliberately change this rule
-secrets.yaml
+homeassistant/secrets.yaml
 
 # Large generated or media files that can cause slow Git pushes
-www/**/*.mp4
-www/**/*.zip
-www/**/*.tar
-www/community/
-esphome/.esphome/
-zigbee2mqtt/database.db*
-zigbee2mqtt/logs/
+homeassistant/www/**/*.mp4
+homeassistant/www/**/*.zip
+homeassistant/www/**/*.tar
+homeassistant/www/community/
+homeassistant/esphome/.esphome/
+homeassistant/zigbee2mqtt/database.db*
+homeassistant/zigbee2mqtt/logs/
 GITIGNORE
-  chmod 600 "${GITIGNORE_FILE}"
-}
-
-# The ignore file lives directly in /config. It is visible to File Editor and
-# Studio Code Server and does not depend on any separate add-on mount.
-if [[ ! -f "${GITIGNORE_FILE}" ]]; then
-  create_default_gitignore
 fi
+chmod 600 "${ADDON_CONFIG_GITIGNORE}"
+# Keep a visible and persistent compatibility copy in the add-on data folder.
+cp "${ADDON_CONFIG_GITIGNORE}" "${LEGACY_GITIGNORE_FILE}"
+chmod 600 "${LEGACY_GITIGNORE_FILE}"
+
 
 askpass_file=''
 web_pid=''
@@ -67,18 +83,30 @@ cleanup() {
 }
 trap cleanup EXIT
 
-askpass_file="$(mktemp)"
-chmod 700 "${askpass_file}"
-cat >"${askpass_file}" <<'ASKPASS'
+if [[ -n "${github_token}" ]]; then
+  askpass_file="$(mktemp)"
+  chmod 700 "${askpass_file}"
+  cat >"${askpass_file}" <<'ASKPASS'
 #!/bin/sh
 case "$1" in
   *Username*) printf '%s\n' 'x-access-token' ;;
   *) printf '%s\n' "$GITHUB_TOKEN" ;;
 esac
 ASKPASS
-export GIT_ASKPASS="${askpass_file}"
-export GIT_TERMINAL_PROMPT=0
-export GITHUB_TOKEN="${github_token}"
+  export GIT_ASKPASS="${askpass_file}"
+  export GIT_TERMINAL_PROMPT=0
+  export GITHUB_TOKEN="${github_token}"
+fi
+
+gitignore_excludes_secrets() {
+  [[ -f "${GITIGNORE_FILE}" ]] || return 1
+  grep -Eq '^[[:space:]]*/?homeassistant/secrets\.yaml[[:space:]]*$' "${GITIGNORE_FILE}"
+}
+
+include_secrets_is_enabled() {
+  [[ -f "${ADDON_OPTIONS_FILE}" ]] || return 1
+  jq -e '.include_secrets == true' "${ADDON_OPTIONS_FILE}" >/dev/null 2>&1
+}
 
 write_status() {
   local status_key="$1"
@@ -106,9 +134,15 @@ verify_private_repository() {
   local repository_slug api_response private_status
 
   case "${repository_url}" in
-    https://github.com/*) repository_slug="${repository_url#https://github.com/}" ;;
-    git@github.com:*) repository_slug="${repository_url#git@github.com:}" ;;
-    ssh://git@github.com/*) repository_slug="${repository_url#ssh://git@github.com/}" ;;
+    https://github.com/*)
+      repository_slug="${repository_url#https://github.com/}"
+      ;;
+    git@github.com:*)
+      repository_slug="${repository_url#git@github.com:}"
+      ;;
+    ssh://git@github.com/*)
+      repository_slug="${repository_url#ssh://git@github.com/}"
+      ;;
     *)
       bashio::log.fatal 'The backup repository must be a GitHub repository so its private visibility can be verified.'
       return 1
@@ -126,17 +160,59 @@ verify_private_repository() {
     --header "Accept: application/vnd.github+json" \
     --header "Authorization: Bearer ${github_token}" \
     "https://api.github.com/repos/${repository_slug}")"; then
-    bashio::log.fatal 'Could not verify the target repository visibility. No configuration data will be committed or pushed.'
+    bashio::log.fatal 'Could not verify the target repository visibility. No configuration data will be copied or pushed.'
     return 1
   fi
 
   private_status="$(printf '%s' "${api_response}" | jq -r '.private // empty')"
   if [[ "${private_status}" != 'true' ]]; then
-    bashio::log.fatal 'The target repository is not private. No configuration data will be committed or pushed.'
+    bashio::log.fatal 'The target repository is not private. No configuration data will be copied or pushed.'
     return 1
   fi
 
   bashio::log.info 'Verified that the target repository is private.'
+}
+
+copy_path() {
+  local relative_path="$1"
+  local source_path="${CONFIG_DIR}/${relative_path}"
+  local target_path="${SNAPSHOT_DIR}/${relative_path}"
+
+  rm -rf "${target_path}"
+  if [[ -e "${source_path}" ]]; then
+    mkdir -p "$(dirname "${target_path}")"
+    rsync -a --delete \
+      --exclude='__pycache__/' \
+      --exclude='*.pyc' \
+      --exclude='home-assistant_v2.db*' \
+      --exclude='*.log' \
+      "${source_path}" "${target_path}"
+  fi
+}
+
+remove_ignored_paths() {
+  # Git understands the complete .gitignore syntax, including negated patterns.
+  # Remove every ignored path from the snapshot before staging, so ignored data
+  # never becomes part of a new commit or a subsequent push.
+  local ignored_path
+  while IFS= read -r -d '' ignored_path; do
+    rm -rf "${WORK_DIR}/${ignored_path}"
+    bashio::log.info "Excluded ignored path from snapshot: ${ignored_path}"
+  done < <(git -C "${WORK_DIR}" ls-files --others --ignored --exclude-standard -z -- homeassistant)
+}
+
+
+write_gitignore() {
+  local gitignore_path="${WORK_DIR}/.gitignore"
+
+  if [[ ! -s "${GITIGNORE_FILE}" ]]; then
+    rm -f "${gitignore_path}"
+    return
+  fi
+
+  # The add-on panel controls this file. Copy it into the backup repository so
+  # Git applies the configured rules before staging a snapshot.
+  cp "${GITIGNORE_FILE}" "${gitignore_path}"
 }
 
 initialize_empty_remote_repository() {
@@ -151,8 +227,14 @@ initialize_empty_remote_repository() {
 Home Assistant configuration files are backed up here by the [HA Config Sync add-on](https://github.com/ma-world/ha-config.git).
 README
   git -C "${WORK_DIR}" add README.md
-  git -C "${WORK_DIR}" commit -m 'Initialize Home Assistant configuration backup repository'
-  git -C "${WORK_DIR}" push --set-upstream origin "HEAD:${branch}"
+  if ! git -C "${WORK_DIR}" commit -m 'Initialize Home Assistant configuration backup repository'; then
+    bashio::log.fatal 'Could not create the initial README commit for the backup repository.'
+    return 1
+  fi
+  if ! git -C "${WORK_DIR}" push --set-upstream origin "HEAD:${branch}"; then
+    bashio::log.fatal 'Could not push the initial README to the backup repository. No Home Assistant files were copied.'
+    return 1
+  fi
   git -C "${WORK_DIR}" fetch --prune origin "${branch}"
 }
 
@@ -162,7 +244,7 @@ sync_configuration() {
 
   mkdir -p "${WORK_DIR}"
   if [[ ! -d "${WORK_DIR}/.git" ]]; then
-    bashio::log.info 'Initializing local Git checkout.'
+    bashio::log.info 'Initializing local repository clone.'
     git -C "${WORK_DIR}" init --initial-branch="${branch}"
     git -C "${WORK_DIR}" remote add origin "${repository_url}"
   else
@@ -172,6 +254,8 @@ sync_configuration() {
   git -C "${WORK_DIR}" config user.name "${git_name}"
   git -C "${WORK_DIR}" config user.email "${git_email}"
 
+  # Pull an existing branch first. When GitHub reports an empty repository,
+  # initialize it with a README before any Home Assistant data is copied.
   if ! git -C "${WORK_DIR}" fetch --prune origin "${branch}"; then
     bashio::log.warning 'Remote branch could not be fetched; the next run will retry.'
     return 1
@@ -179,8 +263,7 @@ sync_configuration() {
 
   if git -C "${WORK_DIR}" show-ref --verify --quiet "refs/remotes/origin/${branch}"; then
     if git -C "${WORK_DIR}" rev-parse --verify --quiet HEAD >/dev/null; then
-      git -C "${WORK_DIR}" reset --hard "origin/${branch}"
-      git -C "${WORK_DIR}" clean -fd
+      git -C "${WORK_DIR}" rebase "origin/${branch}"
     else
       git -C "${WORK_DIR}" checkout -B "${branch}" "origin/${branch}"
     fi
@@ -188,23 +271,45 @@ sync_configuration() {
     initialize_empty_remote_repository || return 1
   fi
 
-  # Copy only the ignore file into the repository root. The complete Home
-  # Assistant /config directory is mounted directly as a Git worktree below.
-  cp "${GITIGNORE_FILE}" "${WORK_DIR}/.gitignore"
-  git -C "${WORK_DIR}" config core.worktree "${CONFIG_DIR}"
-  git -C "${WORK_DIR}" config core.excludesfile "${GITIGNORE_FILE}"
+  # Preserve visibility of commits made before status tracking was introduced.
+  if [[ ! -f "${STATUS_FILE}" ]] && git -C "${WORK_DIR}" rev-parse --verify --quiet HEAD >/dev/null; then
+    write_status last_commit
+  fi
 
-  # Remove stale index entries. The index is rebuilt from the directly mounted
-  # /config folder on each run, so new ignore rules take effect immediately.
-  rm -f "${WORK_DIR}/.git/index"
-  git -C "${WORK_DIR}" read-tree --empty
-  git -C "${WORK_DIR}" add -A -- .
-  # The persistent ignore file is intentionally part of the backup too, but it
-  # is stored under a neutral name so Git does not use it as an ignore rule.
-  cp "${GITIGNORE_FILE}" "${CONFIG_DIR}/ha_config_sync.gitignore.backup"
-  git -C "${WORK_DIR}" add -- ha_config_sync.gitignore.backup
-  rm -f "${CONFIG_DIR}/ha_config_sync.gitignore.backup"
+  write_gitignore
 
+  mkdir -p "${SNAPSHOT_DIR}"
+  local paths=(
+    automations.yaml blueprints configuration.yaml customize.yaml custom_components
+    esphome groups.yaml packages scenes.yaml scripts.yaml themes www zigbee2mqtt
+  )
+  local path
+  for path in "${paths[@]}"; do
+    copy_path "${path}"
+  done
+
+  if [[ "${include_secrets}" == 'true' ]]; then
+    copy_path 'secrets.yaml'
+  elif ! gitignore_excludes_secrets; then
+    bashio::log.warning 'secrets.yaml is not ignored, but Include secrets is disabled. It will not be copied or committed.'
+  fi
+
+  # Only dashboard definitions are selected from .storage. Auth, tokens, and integrations remain excluded.
+  if [[ "${include_dashboards}" == 'true' ]]; then
+    copy_path '.storage/lovelace'
+    copy_path '.storage/lovelace_dashboards'
+  fi
+
+  remove_ignored_paths
+  git -C "${WORK_DIR}" add -A -- homeassistant
+  # Stage the user-managed ignore file when it exists and stage its deletion
+  # when the editor was intentionally cleared.
+  if git -C "${WORK_DIR}" ls-files --error-unmatch .gitignore >/dev/null 2>&1; then
+    git -C "${WORK_DIR}" add -u -- .gitignore
+  fi
+  if [[ -e "${WORK_DIR}/.gitignore" ]]; then
+    git -C "${WORK_DIR}" add -- .gitignore
+  fi
   if git -C "${WORK_DIR}" diff --cached --quiet; then
     bashio::log.info 'No configuration changes to sync.'
     return 0
@@ -217,11 +322,11 @@ sync_configuration() {
     bashio::log.error 'Configuration commit was created locally, but the push failed. The next scheduled sync will retry.'
     return 1
   fi
-
   write_status last_commit
   bashio::log.info 'Configuration was committed and pushed successfully.'
 }
 
+# The panel is served only on Home Assistant's authenticated ingress endpoint.
 python3 /web.py &
 web_pid=$!
 
