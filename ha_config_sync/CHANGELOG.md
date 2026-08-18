@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.7.1
+
+- Restored the private backup repository button by reading the `origin` URL from the isolated bare Git metadata directory.
+- Updated cache clearing and last-commit lookup to use the current isolated Git metadata layout.
+
 ## 3.7.0
 
 - Corrected the visible add-on configuration path in the UI and documentation to `/addon_configs/080264f0_ha_config_sync/gitignore`.

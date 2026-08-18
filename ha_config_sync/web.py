@@ -16,7 +16,7 @@ STATUS_FILE = Path("/data/sync-status.json")
 WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")
 SYNC_DEBUG_LOG = Path("/data/sync-debug.log")
 OPTIONS_FILE = Path("/data/options.json")
-REPOSITORY_DIR = Path("/data/repository")
+GIT_METADATA_DIR = Path("/data/git")
 ADDON_VERSION = os.getenv("ADDON_VERSION", "unknown")
 PROJECT_URL = "https://github.com/ma-world/ha-config"
 DEFAULT_RULES = """# Runtime and generated Home Assistant data
@@ -167,7 +167,7 @@ def html_escape(value: str) -> str:
 def backup_repository_url() -> str | None:
     try:
         output = subprocess.check_output(
-            ["git", "-C", str(REPOSITORY_DIR), "remote", "get-url", "origin"],
+            ["git", f"--git-dir={GIT_METADATA_DIR}", "remote", "get-url", "origin"],
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
@@ -216,11 +216,11 @@ def read_rules() -> tuple[str, str]:
 
 
 def git_last_commit() -> str | None:
-    if not (REPOSITORY_DIR / ".git").is_dir():
+    if not (GIT_METADATA_DIR / "HEAD").is_file():
         return None
     try:
         return subprocess.check_output(
-            ["git", "-C", str(REPOSITORY_DIR), "log", "-1", "--format=%cI"],
+            ["git", f"--git-dir={GIT_METADATA_DIR}", "log", "-1", "--format=%cI"],
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip() or None
@@ -322,9 +322,17 @@ class Handler(BaseHTTPRequestHandler):
             debug_log("local Git cache clear requested")
             try:
                 import shutil
-                shutil.rmtree(REPOSITORY_DIR)
+                shutil.rmtree(GIT_METADATA_DIR)
             except FileNotFoundError:
                 pass
+            for path in (Path("/data/index"), Path("/data/snapshots")):
+                try:
+                    if path.is_dir():
+                        shutil.rmtree(path)
+                    else:
+                        path.unlink()
+                except FileNotFoundError:
+                    pass
             self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "./?cache-cleared=1")
             self.end_headers()
