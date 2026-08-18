@@ -10,8 +10,7 @@ import subprocess
 from urllib.parse import parse_qs, urlparse
 
 CONFIG_DIR = Path("/homeassistant")
-ADDON_CONFIG_DIR = Path("/config")
-GITIGNORE_FILE = ADDON_CONFIG_DIR / "gitignore"
+GITIGNORE_FILE = Path("/data/gitignore")
 STATUS_FILE = Path("/data/sync-status.json")
 WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")
 SYNC_DEBUG_LOG = Path("/data/sync-debug.log")
@@ -91,14 +90,14 @@ PAGE = """<!doctype html>
     <div class="status-item"><span class="status-label">Last commit with changes</span><span class="status-value">{last_commit}</span></div>
   </div>
   {backup_repository_link}
-  <p>These rules are saved directly in the mounted Home Assistant configuration directory as <code>ha_config_sync.gitignore</code>. This user-managed file persists across add-on updates and is never overwritten when it already exists. The add-on treats the configuration directory as a read-only source tree and stores Git metadata only inside its persistent <code>/data</code> area. The editor shows 15 lines and scrolls for longer rule sets.</p>
+  <p>The active Git ignore rules are stored in the add-on’s persistent <code>/data</code> area. The add-on treats <code>/homeassistant</code> as a read-only source tree and stores Git metadata only inside its persistent <code>/data</code> area.</p>
   {secrets_warning}
   <p><strong>Security:</strong> Keep <code>secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
   <section class="logs">
     <h2>Git ignore file</h2>
     <p>Edit this user-managed file directly with File Editor or Studio Code Server:</p>
-    <pre>/addon_configs/080264f0_ha_config_sync/gitignore</pre>
-    <p>The add-on reads this file during every sync and never overwrites an existing file. The current content is shown below.</p>
+    <pre>/addon_configs/XXXXXXX_ha_config_sync/gitignore</pre>
+    <p>Replace <code>XXXXXXX</code> with your installation-specific add-on ID. The active content is shown below.</p>
     <pre>{rules}</pre>
   </section>
   <form method="post" action="clear-cache" onsubmit="return confirm('Clear the local Git cache? Unpushed local commits will be discarded. The next sync will download the repository again.');">
@@ -110,8 +109,6 @@ PAGE = """<!doctype html>
     <div class="log-links">
       <a class="log-link" href="sync-log" target="_blank">View sync log</a>
       <a class="log-link" href="sync-log?download=1">Download sync log</a>
-      <a class="log-link" href="editor-log" target="_blank">View editor log</a>
-      <a class="log-link" href="editor-log?download=1">Download editor log</a>
     </div>
     <h3>Latest sync log</h3>
     <pre>{sync_log_preview}</pre>
@@ -288,9 +285,6 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(parsed_url.query)
         if path == "/sync-log":
             serve_log(self, SYNC_DEBUG_LOG, "download" in query)
-            return
-        if path == "/editor-log":
-            serve_log(self, WEB_DEBUG_LOG, "download" in query)
             return
         if path != "/":
             self.send_error(HTTPStatus.NOT_FOUND)

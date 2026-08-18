@@ -2,6 +2,12 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.8.1
+
+- Removed the unsupported `addon_config` mount requirement so the add-on can start reliably.
+- Stored the active ignore file in persistent add-on data at `/data/gitignore` and kept the generic host-side add-on path display.
+- Removed the View/Download Editor Log buttons from Diagnostics.
+
 ## 3.7.1
 
 - Restored the private backup repository button by reading the `origin` URL from the isolated bare Git metadata directory.

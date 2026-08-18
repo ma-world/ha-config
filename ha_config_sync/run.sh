@@ -7,8 +7,7 @@ readonly GIT_METADATA_DIR=/data/git
 readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
 readonly SYNC_DEBUG_LOG=/data/sync-debug.log
-readonly ADDON_CONFIG_DIR=/config
-readonly GITIGNORE_FILE="${ADDON_CONFIG_DIR}/gitignore"
+readonly GITIGNORE_FILE=/data/gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
 
 repository_url="$(bashio::config 'repository_url')"
@@ -57,18 +56,9 @@ GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 }
 
-# The user-managed ignore file lives in the Home Assistant add-on config
-# folder. The Supervisor maps it explicitly into this container at /config.
-# Never replace an existing file: defaults are created only once when absent.
-if [[ ! -d "${CONFIG_DIR}" ]]; then
-  bashio::log.fatal "Home Assistant configuration directory is not mounted: ${CONFIG_DIR}."
-  exit 1
-fi
-if [[ ! -d "${ADDON_CONFIG_DIR}" ]]; then
-  bashio::log.fatal "Add-on configuration directory is not mounted: ${ADDON_CONFIG_DIR}."
-  exit 1
-fi
-bashio::log.info "Using Home Assistant config source: ${CONFIG_DIR}; add-on config: ${ADDON_CONFIG_DIR}."
+# The user-managed ignore file is stored in persistent add-on data. It is
+# never overwritten when it already exists. A generic host-side path is shown
+# in the Web UI for installations that expose add-on config folders.
 if [[ ! -e "${GITIGNORE_FILE}" ]]; then
   bashio::log.warning "Git ignore file not found; creating defaults at ${GITIGNORE_FILE}."
   create_default_gitignore
