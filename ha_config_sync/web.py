@@ -58,12 +58,13 @@ PAGE = """<!doctype html>
     .danger-button:hover { background: #b71c1c; }
     .notice { padding: 10px 12px; border-radius: 6px; background: #d9f5e5; color: #095a31; }
     .warning { padding: 10px 12px; border-radius: 6px; background: #fff1c2; color: #6a4600; line-height: 1.5; }
+    .error { padding: 10px 12px; border-radius: 6px; background: #ffd9d9; color: #7a0000; line-height: 1.5; }
     .status { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 16px 0; }
     .status-item { padding: 12px; border: 1px solid #c7cdd4; border-radius: 6px; }
     .status-label { display: block; font-size: .85rem; color: #5e6b76; }
     .status-value { display: block; margin-top: 4px; font-weight: 700; }
     code { background: #e8ebef; padding: 2px 4px; border-radius: 3px; }
-    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .warning { background: #4a3612; color: #ffe2a3; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } .repository-link { background: #455a64; color: #fff; } .repository-link:hover { background: #546e7a; } .danger-button { background: #c62828; } .danger-button:hover { background: #b71c1c; } code { background: #343d46; } }
+    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .warning { background: #4a3612; color: #ffe2a3; } .error { background: #4a1717; color: #ffb8b8; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } .repository-link { background: #455a64; color: #fff; } .repository-link:hover { background: #546e7a; } .danger-button { background: #c62828; } .danger-button:hover { background: #b71c1c; } code { background: #343d46; } }
   </style>
 </head>
 <body>
@@ -125,16 +126,23 @@ def backup_repository_link() -> str:
             f'rel="noopener noreferrer">Open private backup repository</a>')
 
 
-def read_rules() -> str:
+def read_rules() -> tuple[str, str]:
     try:
         rules = GITIGNORE_FILE.read_text(encoding="utf-8")
-    except (FileNotFoundError, OSError):
+    except FileNotFoundError:
         rules = ""
+    except OSError as error:
+        return "", f"<p class='error'><strong>Cannot read the Git ignore file:</strong> {html_escape(str(error))}</p>"
+
     if rules.strip():
-        return rules
-    GITIGNORE_FILE.write_text(DEFAULT_RULES, encoding="utf-8")
-    GITIGNORE_FILE.chmod(0o600)
-    return DEFAULT_RULES
+        return rules, ""
+
+    try:
+        GITIGNORE_FILE.write_text(DEFAULT_RULES, encoding="utf-8")
+        GITIGNORE_FILE.chmod(0o600)
+    except OSError as error:
+        return "", f"<p class='error'><strong>Cannot create the Git ignore file:</strong> {html_escape(str(error))}</p>"
+    return DEFAULT_RULES, ""
 
 
 def git_last_commit() -> str | None:
@@ -213,14 +221,16 @@ class Handler(BaseHTTPRequestHandler):
             return
         query = urlparse(self.path).query
         if "saved=1" in query:
-            message = "<p class=\"notice\">Ignore rules saved in /config. They will be applied during the next sync.</p>"
+            message = '<p class="notice">Ignore rules saved in /config. They will be applied during the next sync.</p>'
         elif "cache-cleared=1" in query:
-            message = "<p class=\"notice\">Local Git cache cleared. The next sync will download the repository again.</p>"
+            message = '<p class="notice">Local Git cache cleared. The next sync will download the repository again.</p>'
+        elif "save-error=1" in query:
+            message = '<p class="error"><strong>The Git ignore file could not be saved.</strong> Check that /config is writable for the add-on.</p>'
         else:
             message = ""
         status = read_status()
-        rules = read_rules()
-        page = (PAGE.replace("{notice}", message)
+        rules, rules_error = read_rules()
+        page = (PAGE.replace("{notice}", message + rules_error)
                      .replace("{secrets_warning}", secrets_warning(rules))
                      .replace("{backup_repository_link}", backup_repository_link())
                      .replace("{rules}", html_escape(rules))
@@ -241,8 +251,14 @@ class Handler(BaseHTTPRequestHandler):
             payload = self.rfile.read(length).decode("utf-8")
             rules = parse_qs(payload, keep_blank_values=True).get("gitignore", [""])[0]
             rules = rules.rstrip("\n") + "\n" if rules else ""
-            GITIGNORE_FILE.write_text(rules, encoding="utf-8")
-            GITIGNORE_FILE.chmod(0o600)
+            try:
+                GITIGNORE_FILE.write_text(rules, encoding="utf-8")
+                GITIGNORE_FILE.chmod(0o600)
+            except OSError:
+                self.send_response(HTTPStatus.SEE_OTHER)
+                self.send_header("Location", "./?save-error=1")
+                self.end_headers()
+                return
             self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "./?saved=1")
             self.end_headers()

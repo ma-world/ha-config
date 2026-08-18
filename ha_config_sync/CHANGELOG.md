@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.1.6
+
+- Fixed Git Ignore Editor save handling and added a visible error message if `/config/ha_config_sync.gitignore` cannot be written.
+
 ## 3.1.5
 
 - Fixed first-commit creation for an empty private backup repository by ensuring all Git plumbing commands use the isolated Git metadata directory.
