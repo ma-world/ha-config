@@ -8,7 +8,8 @@ import os
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
-GITIGNORE_FILE = Path("/config/ha_config_sync.gitignore")
+CONFIG_DIR = Path(os.getenv("HOMEASSISTANT_CONFIG", "/config"))
+GITIGNORE_FILE = CONFIG_DIR / "ha_config_sync.gitignore"
 STATUS_FILE = Path("/data/sync-status.json")
 WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")
 SYNC_DEBUG_LOG = Path("/data/sync-debug.log")
@@ -86,7 +87,7 @@ PAGE = """<!doctype html>
     <div class="status-item"><span class="status-label">Last commit with changes</span><span class="status-value">{last_commit}</span></div>
   </div>
   {backup_repository_link}
-  <p>These rules are saved directly as <code>/config/ha_config_sync.gitignore</code>. This user-managed file persists across add-on updates and is never overwritten when it already exists. The add-on treats <code>/config</code> as a read-only source tree and stores Git metadata only inside its persistent <code>/data</code> area. The editor shows 15 lines and scrolls for longer rule sets.</p>
+  <p>These rules are saved directly in the mounted Home Assistant configuration directory as <code>ha_config_sync.gitignore</code>. This user-managed file persists across add-on updates and is never overwritten when it already exists. The add-on treats the configuration directory as a read-only source tree and stores Git metadata only inside its persistent <code>/data</code> area. The editor shows 15 lines and scrolls for longer rule sets.</p>
   {secrets_warning}
   <p><strong>Security:</strong> Keep <code>secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
   <form method="post" action="save">

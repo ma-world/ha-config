@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.4.1
+
+- Fixed the Home Assistant configuration mount path by using the Supervisor-provided `HOMEASSISTANT_CONFIG` location instead of assuming `/config`.
+- Added a clear startup error when the Home Assistant configuration directory is unavailable.
+
 ## 3.4.0
 
 - Added a Diagnostics section to the Web UI with log previews and secure view/download links for selected `/data` diagnostic logs.
