@@ -5,7 +5,8 @@ set -Eeuo pipefail
 readonly CONFIG_DIR=/config
 readonly WORK_DIR=/data/repository
 readonly SNAPSHOT_DIR="${WORK_DIR}/homeassistant"
-readonly GITIGNORE_FILE=/data/gitignore
+readonly ADDON_CONFIG_DIR=/addon_configs/${HOSTNAME}
+readonly GITIGNORE_FILE=${ADDON_CONFIG_DIR}/gitignore
 readonly STATUS_FILE=/data/sync-status.json
 readonly ADDON_OPTIONS_FILE=/data/options.json
 
@@ -32,6 +33,34 @@ fi
 if [[ -z "${github_token}" ]]; then
   bashio::log.fatal 'github_token is required to verify that the backup repository is private.'
   exit 1
+fi
+
+# Persist the ignore rules in Home Assistant's add-on configuration storage.
+# Unlike /data, this path is intended for user-managed add-on files.
+mkdir -p "${ADDON_CONFIG_DIR}"
+chmod 700 "${ADDON_CONFIG_DIR}"
+if [[ ! -f "${GITIGNORE_FILE}" ]]; then
+  cat >"${GITIGNORE_FILE}" <<'GITIGNORE'
+# Runtime and generated Home Assistant data
+homeassistant/home-assistant_v2.db*
+homeassistant/*.log
+homeassistant/.storage/*
+!homeassistant/.storage/lovelace
+!homeassistant/.storage/lovelace_dashboards
+
+# Credentials are excluded unless you deliberately change this rule
+homeassistant/secrets.yaml
+
+# Large generated or media files that can cause slow Git pushes
+homeassistant/www/**/*.mp4
+homeassistant/www/**/*.zip
+homeassistant/www/**/*.tar
+homeassistant/www/community/
+homeassistant/esphome/.esphome/
+homeassistant/zigbee2mqtt/database.db*
+homeassistant/zigbee2mqtt/logs/
+GITIGNORE
+  chmod 600 "${GITIGNORE_FILE}"
 fi
 
 askpass_file=''
@@ -149,6 +178,18 @@ copy_path() {
   fi
 }
 
+remove_ignored_paths() {
+  # Git understands the complete .gitignore syntax, including negated patterns.
+  # Remove every ignored path from the snapshot before staging, so ignored data
+  # never becomes part of a new commit or a subsequent push.
+  local ignored_path
+  while IFS= read -r -d '' ignored_path; do
+    rm -rf "${WORK_DIR}/${ignored_path}"
+    bashio::log.info "Excluded ignored path from snapshot: ${ignored_path}"
+  done < <(git -C "${WORK_DIR}" ls-files --others --ignored --exclude-standard -z -- homeassistant)
+}
+
+
 write_gitignore() {
   local gitignore_path="${WORK_DIR}/.gitignore"
 
@@ -160,20 +201,6 @@ write_gitignore() {
   # The add-on panel controls this file. Copy it into the backup repository so
   # Git applies the configured rules before staging a snapshot.
   cp "${GITIGNORE_FILE}" "${gitignore_path}"
-}
-
-remove_now_ignored_files() {
-  # Files that were already committed remain tracked even after adding a
-  # .gitignore rule. Remove them from the index and working copy so the next
-  # commit stops attempting to push old, unwanted data.
-  local tracked_file
-  while IFS= read -r tracked_file; do
-    if git -C "${WORK_DIR}" check-ignore -q -- "${tracked_file}"; then
-      git -C "${WORK_DIR}" rm -r --cached --ignore-unmatch -- "${tracked_file}"
-      rm -rf "${WORK_DIR}/${tracked_file}"
-      bashio::log.info "Removed newly ignored path from local Git cache: ${tracked_file}"
-    fi
-  done < <(git -C "${WORK_DIR}" ls-files --cached -- homeassistant)
 }
 
 initialize_empty_remote_repository() {
@@ -261,7 +288,7 @@ sync_configuration() {
     copy_path '.storage/lovelace_dashboards'
   fi
 
-  remove_now_ignored_files
+  remove_ignored_paths
   git -C "${WORK_DIR}" add -A -- homeassistant
   # Stage the user-managed ignore file when it exists and stage its deletion
   # when the editor was intentionally cleared.

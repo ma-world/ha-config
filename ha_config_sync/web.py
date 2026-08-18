@@ -8,7 +8,8 @@ import os
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
-GITIGNORE_FILE = Path("/data/gitignore")
+ADDON_CONFIG_DIR = Path("/addon_configs") / os.getenv("HOSTNAME", "ha_config_sync")
+GITIGNORE_FILE = ADDON_CONFIG_DIR / "gitignore"
 STATUS_FILE = Path("/data/sync-status.json")
 OPTIONS_FILE = Path("/data/options.json")
 REPOSITORY_DIR = Path("/data/repository")
@@ -28,6 +29,7 @@ homeassistant/secrets.yaml
 homeassistant/www/**/*.mp4
 homeassistant/www/**/*.zip
 homeassistant/www/**/*.tar
+homeassistant/www/community/
 homeassistant/esphome/.esphome/
 homeassistant/zigbee2mqtt/database.db*
 homeassistant/zigbee2mqtt/logs/
@@ -77,7 +79,7 @@ PAGE = """<!doctype html>
     <div class="status-item"><span class="status-label">Last commit with changes</span><span class="status-value">{last_commit}</span></div>
   </div>
   {backup_repository_link}
-  <p>These rules are copied to <code>.gitignore</code> in the private backup repository before every sync. The editor shows 15 lines and scrolls for longer rule sets.</p>
+  <p>These rules are stored in the Home Assistant add-on configuration folder and are applied while copying files as well as before Git commits. They are also copied to <code>.gitignore</code> in the private backup repository. The editor shows 15 lines and scrolls for longer rule sets.</p>
   {secrets_warning}
   <p><strong>Security:</strong> Keep <code>homeassistant/secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
   <form method="post" action="save">
@@ -147,6 +149,7 @@ def read_rules() -> str:
     repository_rules = repository_gitignore()
     rules = repository_rules or DEFAULT_RULES
     GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    GITIGNORE_FILE.parent.chmod(0o700)
     GITIGNORE_FILE.write_text(rules, encoding="utf-8")
     GITIGNORE_FILE.chmod(0o600)
     return rules
@@ -226,7 +229,13 @@ class Handler(BaseHTTPRequestHandler):
         if path != "/":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
-        message = "<p class=\"notice\">Ignore rules saved.</p>" if "saved=1" in self.path else ""
+        query = urlparse(self.path).query
+        if "saved=1" in query:
+            message = "<p class=\"notice\">Ignore rules saved locally and applied to the current Git checkout. They will be committed during the next sync.</p>"
+        elif "cache-cleared=1" in query:
+            message = "<p class=\"notice\">Local Git cache cleared. The next sync will download the repository again.</p>"
+        else:
+            message = ""
         status = read_status()
         rules = read_rules()
         page = (PAGE.replace("{notice}", message)
@@ -251,6 +260,7 @@ class Handler(BaseHTTPRequestHandler):
             rules = parse_qs(payload, keep_blank_values=True).get("gitignore", [""])[0]
             rules = rules.rstrip("\n") + "\n" if rules else ""
             GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            GITIGNORE_FILE.parent.chmod(0o700)
             GITIGNORE_FILE.write_text(rules, encoding="utf-8")
             GITIGNORE_FILE.chmod(0o600)
             # Apply the saved editor content immediately to the local clone as

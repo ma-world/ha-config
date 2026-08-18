@@ -2,6 +2,16 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 2.0.1
+
+- Fixed ignore enforcement: Git now removes ignored paths from the snapshot before staging, without attempting an unreliable rsync filter translation.
+- Added `homeassistant/www/community/` to the default ignore rules to exclude downloaded community frontend plugins.
+
+## 2.0.0
+
+- Moved the persistent Git ignore file into Home Assistant add-on configuration storage instead of the add-on data directory.
+- Applied Git ignore rules during file copying, so excluded paths are no longer copied into the local Git cache before staging.
+
 ## 1.9.1
 
 - Fixed the Git Ignore Editor so saved rules remain authoritative instead of being replaced by an older local checkout.
