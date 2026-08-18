@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.1.7
+
+- Replaced the deprecated `config` map with `homeassistant_config`.
+- Added diagnostic logs for Git ignore file creation, reading, saving, index rebuilding, and staged path counts.
+
 ## 3.1.6
 
 - Fixed Git Ignore Editor save handling and added a visible error message if `/config/ha_config_sync.gitignore` cannot be written.

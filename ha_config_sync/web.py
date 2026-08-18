@@ -10,6 +10,7 @@ from urllib.parse import parse_qs, urlparse
 
 GITIGNORE_FILE = Path("/config/ha_config_sync.gitignore")
 STATUS_FILE = Path("/data/sync-status.json")
+WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")
 OPTIONS_FILE = Path("/data/options.json")
 REPOSITORY_DIR = Path("/data/repository")
 ADDON_VERSION = os.getenv("ADDON_VERSION", "unknown")
@@ -93,6 +94,16 @@ PAGE = """<!doctype html>
 </body></html>"""
 
 
+def debug_log(message: str) -> None:
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        with WEB_DEBUG_LOG.open("a", encoding="utf-8") as log_file:
+            log_file.write(f"{timestamp} {message}\n")
+        WEB_DEBUG_LOG.chmod(0o600)
+    except OSError:
+        pass
+
+
 def html_escape(value: str) -> str:
     return (value.replace("&", "&amp;").replace("<", "&lt;")
                  .replace(">", "&gt;").replace('"', "&quot;"))
@@ -135,13 +146,17 @@ def read_rules() -> tuple[str, str]:
         return "", f"<p class='error'><strong>Cannot read the Git ignore file:</strong> {html_escape(str(error))}</p>"
 
     if rules.strip():
+        debug_log(f"editor read {len(rules)} bytes from {GITIGNORE_FILE}")
         return rules, ""
 
+    debug_log(f"editor found no rules in {GITIGNORE_FILE}; creating defaults")
     try:
         GITIGNORE_FILE.write_text(DEFAULT_RULES, encoding="utf-8")
         GITIGNORE_FILE.chmod(0o600)
     except OSError as error:
+        debug_log(f"editor failed to create {GITIGNORE_FILE}: {error}")
         return "", f"<p class='error'><strong>Cannot create the Git ignore file:</strong> {html_escape(str(error))}</p>"
+    debug_log(f"editor created default rules at {GITIGNORE_FILE}")
     return DEFAULT_RULES, ""
 
 
@@ -251,19 +266,26 @@ class Handler(BaseHTTPRequestHandler):
             payload = self.rfile.read(length).decode("utf-8")
             rules = parse_qs(payload, keep_blank_values=True).get("gitignore", [""])[0]
             rules = rules.rstrip("\n") + "\n" if rules else ""
+            debug_log(f"editor save requested: {len(rules)} bytes to {GITIGNORE_FILE}")
             try:
                 GITIGNORE_FILE.write_text(rules, encoding="utf-8")
                 GITIGNORE_FILE.chmod(0o600)
-            except OSError:
+                persisted = GITIGNORE_FILE.read_text(encoding="utf-8")
+                if persisted != rules:
+                    raise OSError("verification read did not match saved content")
+            except OSError as error:
+                debug_log(f"editor save failed: {error}")
                 self.send_response(HTTPStatus.SEE_OTHER)
                 self.send_header("Location", "./?save-error=1")
                 self.end_headers()
                 return
+            debug_log(f"editor save completed: {len(rules)} bytes persisted to {GITIGNORE_FILE}")
             self.send_response(HTTPStatus.SEE_OTHER)
             self.send_header("Location", "./?saved=1")
             self.end_headers()
             return
         if path == "/clear-cache":
+            debug_log("local Git cache clear requested")
             try:
                 import shutil
                 shutil.rmtree(REPOSITORY_DIR)

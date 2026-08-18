@@ -58,7 +58,10 @@ GITIGNORE
 # This file is part of the user's Home Assistant configuration and is visible
 # in File Editor and Studio Code Server. It is never created through Git.
 if [[ ! -f "${GITIGNORE_FILE}" ]]; then
+  bashio::log.warning "Git ignore file not found; creating default at ${GITIGNORE_FILE}."
   create_default_gitignore
+else
+  bashio::log.info "Using Git ignore file: ${GITIGNORE_FILE} ($(wc -c < "${GITIGNORE_FILE}") bytes)."
 fi
 
 askpass_file=''
@@ -167,11 +170,13 @@ initialize_empty_remote_repository() {
 
 
 rebuild_index_from_config() {
+  bashio::log.info 'Rebuilding isolated Git index from the read-only /config source tree.'
   # Rebuilding only the index applies ignore changes immediately without
   # modifying a single file under /config.
   rm -f "${INDEX_FILE}"
   safe_git read-tree --empty
   safe_git add -A -- .
+  bashio::log.info "Staged $(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" diff --cached --name-only | wc -l | tr -d ' ') path(s) after applying ignore rules."
 
   # Preserve a copy of the rules in the private repository under a neutral name.
   # The original file remains in /config and is ignored by its own rules.
