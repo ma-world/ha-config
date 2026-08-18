@@ -3,11 +3,10 @@
 set -Eeuo pipefail
 
 readonly CONFIG_DIR=/config
-readonly ADDON_CONFIG_DIR=/addon_configs/080264f0-ha-config-sync
 readonly GIT_METADATA_DIR=/data/git
 readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
-readonly GITIGNORE_FILE=${ADDON_CONFIG_DIR}/gitignore
+readonly GITIGNORE_FILE=/config/ha_config_sync.gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
 
 repository_url="$(bashio::config 'repository_url')"
@@ -56,17 +55,19 @@ GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 }
 
-# The visible ignore file is stored in Home Assistant's mounted add-on
-# configuration directory. This stable directory name matches the add-on ID
-# assigned by the Supervisor; no file synchronization is required.
-mkdir -p "${ADDON_CONFIG_DIR}"
-chmod 700 "${ADDON_CONFIG_DIR}"
-if [[ ! -f "${GITIGNORE_FILE}" ]]; then
-  bashio::log.warning "Git ignore file not found; creating default at ${GITIGNORE_FILE}."
+# The user-managed ignore file lives in /config, which persists across add-on
+# updates. Never replace an existing file: defaults are created only once when
+# the file does not exist.
+if [[ ! -e "${GITIGNORE_FILE}" ]]; then
+  bashio::log.warning "Git ignore file not found; creating defaults at ${GITIGNORE_FILE}."
   create_default_gitignore
+elif [[ ! -f "${GITIGNORE_FILE}" ]]; then
+  bashio::log.fatal "Git ignore path exists but is not a regular file: ${GITIGNORE_FILE}."
+  exit 1
 else
-  bashio::log.info "Using Git ignore file: ${GITIGNORE_FILE} ($(wc -c < "${GITIGNORE_FILE}") bytes)."
+  bashio::log.info "Using existing Git ignore file without modification: ${GITIGNORE_FILE} ($(wc -c < "${GITIGNORE_FILE}") bytes)."
 fi
+
 
 askpass_file=''
 web_pid=''

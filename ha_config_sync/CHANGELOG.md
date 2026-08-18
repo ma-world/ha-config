@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.3.0
+
+- Moved the user-managed Git ignore file back to `/config/ha_config_sync.gitignore`, which persists across add-on updates.
+- Existing Git ignore files are never overwritten during startup or upgrades; defaults are created only if the file does not exist.
+
 ## 3.2.1
 
 - Fixed the Git Ignore Editor and sync process to use the same fixed Home Assistant add-on configuration directory.
