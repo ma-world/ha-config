@@ -10,7 +10,8 @@ import subprocess
 from urllib.parse import parse_qs, urlparse
 
 CONFIG_DIR = Path("/homeassistant")
-GITIGNORE_FILE = Path("/data/gitignore")
+ADDON_CONFIG_DIR = Path("/addon_configs/080264f0_ha_config_sync")
+GITIGNORE_FILE = ADDON_CONFIG_DIR / "gitignore"
 STATUS_FILE = Path("/data/sync-status.json")
 WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")
 SYNC_DEBUG_LOG = Path("/data/sync-debug.log")
@@ -95,7 +96,9 @@ PAGE = """<!doctype html>
   <p><strong>Security:</strong> Keep <code>secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
   <section class="logs">
     <h2>Active Git ignore rules</h2>
-    <p>This is a read-only preview of the rules currently applied during synchronization.</p>
+    <p>Edit this persistent user-managed file with File Editor or Studio Code Server:</p>
+    <pre>/addon_configs/080264f0_ha_config_sync/gitignore</pre>
+    <p>This read-only preview shows the exact rules that are currently applied during synchronization.</p>
     <pre>{rules}</pre>
   </section>
   <form method="post" action="clear-cache" onsubmit="return confirm('Clear the local Git cache? Unpushed local commits will be discarded. The next sync will download the repository again.');">

@@ -34,7 +34,13 @@ External add-on data outside `/homeassistant` is not included.
 
 ## Git ignore rules
 
-The Web UI displays the active Git ignore rules used for synchronization. Rules are stored in the add-on’s persistent data area and are not overwritten if an existing rule file is present.
+The Web UI displays the active Git ignore rules used for synchronization. To change them, edit this persistent file with File Editor or Studio Code Server:
+
+```text
+/addon_configs/080264f0_ha_config_sync/gitignore
+```
+
+The add-on never overwrites an existing rule file during startup or update.
 
 The default rules exclude runtime data, logs, credentials, selected large media files, community frontend assets, ESPHome build artifacts, and common Zigbee2MQTT database/log files.
 

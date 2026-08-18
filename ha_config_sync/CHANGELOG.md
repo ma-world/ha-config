@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.9.1
+
+- Restored use of the actual Supervisor-managed add-on configuration folder at `/addon_configs/080264f0_ha_config_sync` for the shared Git ignore file.
+- The Web UI and documentation now show the exact file path and explain how to edit it with File Editor or Studio Code Server.
+
 ## 3.9.0
 
 - Updated the app description, Web UI labels, and documentation to reflect the current architecture.
