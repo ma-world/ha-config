@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.1.4
+
+- Fixed setup for a new private repository with no branch or commits yet. The add-on now detects and initializes an empty remote repository instead of failing while fetching a missing branch.
+
 ## 3.1.3
 
 - Fixed recovery for existing isolated Git metadata directories that were missing the `origin` remote.

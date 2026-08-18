@@ -197,8 +197,11 @@ sync_configuration() {
   git --git-dir="${GIT_METADATA_DIR}" config user.name "${git_name}"
   git --git-dir="${GIT_METADATA_DIR}" config user.email "${git_email}"
 
-  if ! git --git-dir="${GIT_METADATA_DIR}" fetch --prune origin "${branch}"; then
-    bashio::log.warning 'Remote branch could not be fetched; the next run will retry.'
+  # Fetch all remote references. Fetching a specific branch fails with
+  # "couldn't find remote ref" when a newly created private repository has no
+  # first commit yet; that empty state is initialized safely below.
+  if ! git --git-dir="${GIT_METADATA_DIR}" fetch --prune origin; then
+    bashio::log.warning 'Remote repository could not be fetched; the next run will retry.'
     return 1
   fi
 
