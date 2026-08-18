@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.0.2
+
+- Fixed Web UI sync-debug-log links for Home Assistant ingress by using explicit relative paths.
+- Added browser-friendly inline/download response headers and request logging for sync debug log access.
+
 ## 4.0.1
 
 - Restored explicit viewing and downloading of the persistent sync debug log in the Web UI Diagnostics section.

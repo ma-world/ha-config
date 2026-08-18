@@ -104,8 +104,8 @@ PAGE = """<!doctype html>
     <h2>Diagnostics</h2>
     <p>These are selected diagnostic logs from the add-on’s persistent <code>/data</code> directory. Git metadata is never exposed here.</p>
     <div class="log-links">
-      <a class="log-link" href="sync-log" target="_blank">View sync debug log</a>
-      <a class="log-link" href="sync-log?download=1">Download sync debug log</a>
+      <a class="log-link" href="./sync-log">View sync debug log</a>
+      <a class="log-link" href="./sync-log?download=1">Download sync debug log</a>
     </div>
     <h3>Latest sync debug log</h3>
     <pre>{sync_log_preview}</pre>
@@ -146,8 +146,12 @@ def serve_log(handler: BaseHTTPRequestHandler, path: Path, download: bool) -> No
     content = read_log(path).encode("utf-8")
     handler.send_response(HTTPStatus.OK)
     handler.send_header("Content-Type", "text/plain; charset=utf-8")
+    handler.send_header("Cache-Control", "no-store")
+    handler.send_header("X-Content-Type-Options", "nosniff")
     if download:
         handler.send_header("Content-Disposition", f'attachment; filename="{path.name}"')
+    else:
+        handler.send_header("Content-Disposition", f'inline; filename="{path.name}"')
     handler.send_header("Content-Length", str(len(content)))
     handler.end_headers()
     handler.wfile.write(content)
@@ -291,7 +295,9 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed_url.path.rstrip("/") or "/"
         query = parse_qs(parsed_url.query)
         if path == "/sync-log":
-            serve_log(self, SYNC_DEBUG_LOG, "download" in query)
+            download = "download" in query
+            debug_log(f"sync debug log requested; download={download}")
+            serve_log(self, SYNC_DEBUG_LOG, download)
             return
         if path != "/":
             self.send_error(HTTPStatus.NOT_FOUND)
