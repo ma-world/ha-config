@@ -164,10 +164,25 @@ def html_escape(value: str) -> str:
 
 
 def host_gitignore_path() -> str:
-    # The Supervisor mount diagnostics identify the host directory as
-    # /supervisor/app_configs/080264f0_ha_config_sync. Studio Code exposes the
-    # same directory through /addon_configs/080264f0_ha_config_sync.
-    return "/addon_configs/080264f0_ha_config_sync/gitignore"
+    """Derive Studio Code's host-visible path from Supervisor mount metadata."""
+    try:
+        for line in Path("/proc/self/mountinfo").read_text(encoding="utf-8").splitlines():
+            parts = line.split(" - ", 1)
+            if len(parts) != 2:
+                continue
+            pre, post = parts
+            fields = pre.split()
+            if len(fields) < 5 or fields[4] != "/config":
+                continue
+            source_root = fields[3]
+            marker = "/supervisor/app_configs/"
+            if source_root.startswith(marker):
+                slug = source_root.removeprefix(marker).strip("/")
+                if slug:
+                    return f"/addon_configs/{slug}/gitignore"
+    except OSError:
+        pass
+    return "/config/gitignore (inside the add-on container)"
 
 
 def backup_repository_url() -> str | None:

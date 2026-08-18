@@ -25,7 +25,7 @@ The add-on treats `/homeassistant` as a read-only source tree. It does not run G
 6. Set `gitignore_host_path` to the path you use to edit the persistent Git ignore file on the Home Assistant host. The default is:
 
    ```text
-   /addon_configs/080264f0_ha_config_sync/gitignore
+   /addon_configs/<installation-specific-addon-slug>/gitignore
    ```
 
 7. Start the add-on. It syncs immediately and then repeats at the configured interval.

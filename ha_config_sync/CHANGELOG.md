@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.3.1
+
+- Made the host-visible Git ignore path portable by deriving the add-on slug from the Supervisor `/config` mount metadata at runtime.
+
 ## 4.3.0
 
 - Completed the verified `addon_config` migration: the active Git ignore file is now `/config/gitignore` in the container, shared with `/addon_configs/080264f0_ha_config_sync/gitignore` on the host.
