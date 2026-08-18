@@ -2,12 +2,13 @@
 # shellcheck shell=bash
 set -Eeuo pipefail
 
-readonly CONFIG_DIR=/config
+readonly CONFIG_DIR=/homeassistant
 readonly GIT_METADATA_DIR=/data/git
 readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
 readonly SYNC_DEBUG_LOG=/data/sync-debug.log
-readonly GITIGNORE_FILE="${CONFIG_DIR}/ha_config_sync.gitignore"
+readonly ADDON_CONFIG_DIR=/config
+readonly GITIGNORE_FILE="${ADDON_CONFIG_DIR}/gitignore"
 readonly SNAPSHOT_DIR=/data/snapshots
 
 repository_url="$(bashio::config 'repository_url')"
@@ -56,14 +57,18 @@ GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 }
 
-# The user-managed ignore file lives in the mounted Home Assistant config
-# directory, which persists across add-on updates. Never replace an existing
-# file: defaults are created only once when the file does not exist.
+# The user-managed ignore file lives in Home Assistant's mounted add-on
+# configuration directory (/config). Never replace an existing file: defaults
+# are created only once when the file does not exist.
 if [[ ! -d "${CONFIG_DIR}" ]]; then
   bashio::log.fatal "Home Assistant configuration directory is not mounted: ${CONFIG_DIR}."
   exit 1
 fi
-bashio::log.info "Using Home Assistant configuration directory: ${CONFIG_DIR}."
+if [[ ! -d "${ADDON_CONFIG_DIR}" ]]; then
+  bashio::log.fatal "Add-on configuration directory is not mounted: ${ADDON_CONFIG_DIR}."
+  exit 1
+fi
+bashio::log.info "Using Home Assistant config source: ${CONFIG_DIR}; add-on config: ${ADDON_CONFIG_DIR}."
 if [[ ! -e "${GITIGNORE_FILE}" ]]; then
   bashio::log.warning "Git ignore file not found; creating defaults at ${GITIGNORE_FILE}."
   create_default_gitignore

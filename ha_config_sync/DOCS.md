@@ -1,6 +1,6 @@
 # Home Assistant Configuration Sync
 
-This is a **public Home Assistant add-on repository**. The add-on reads the mounted Home Assistant `/config` directory, creates a Git commit when changes are detected, and pushes it to the Git repository you configure. Git metadata is isolated inside the add-on; `/config` is never used for Git cleanup or checkout operations.
+This is a **public Home Assistant add-on repository**. The add-on reads the mounted Home Assistant `/homeassistant` directory, creates a Git commit when changes are detected, and pushes it to the Git repository you configure. Git metadata is isolated inside the add-on; `/config` is never used for Git cleanup or checkout operations.
 
 1. The add-on starts automatically when Home Assistant starts.
 2. It runs one sync immediately, then repeats at the interval configured in the add-on settings (four hours by default).
@@ -23,7 +23,7 @@ This is a **public Home Assistant add-on repository**. The add-on reads the moun
 
 ## Included files
 
-The add-on backs up the mounted Home Assistant `/config` directory. External add-on data directories outside `/config` are not included.
+The add-on backs up the mounted Home Assistant `/homeassistant` directory. External add-on data directories outside `/config` are not included.
 
 Before copying or pushing any configuration data, the add-on checks the GitHub API and proceeds only if the target repository is private. If visibility cannot be verified or the repository is public, it writes an error to the add-on log and does not perform a backup. If the private repository is empty, it creates and pushes an English README that identifies it as a backup destination for this add-on, then continues with the normal sync.
 
@@ -31,7 +31,7 @@ Runtime data, databases, logs, authentication data, tokens, and `secrets.yaml` a
 
 ## Changing the interval or Git ignore rules
 
-Open the **HA Config Sync** app page to change `sync_interval_hours`. To edit Git ignore rules, select **Open Web UI** on the same app page; saving there updates the local Git checkout immediately and is committed during the next sync without restarting the add-on. The Git Ignore Editor saves its rules directly as `/config/ha_config_sync.gitignore`. This is a user-managed Home Assistant configuration file: it persists across add-on updates and the add-on never overwrites it when it already exists. Git metadata remains in the add-on’s persistent `/data` area. The add-on uses the rules when building an isolated Git index from `/config`; it does not modify or clean files in `/config`. The Web UI also shows the most recent sync check, the timestamp of the latest commit in the local backup checkout, an **Open private backup repository** button when a GitHub backup remote is configured, and a **Diagnostics** section for viewing or downloading selected add-on logs. Use **Clear local Git cache** to discard the local clone and any unpushed local commits; the next sync downloads the backup repository again. The configured ignore rules apply to paths read from `/config` before they are placed in a commit.
+Open the **HA Config Sync** app page to change `sync_interval_hours`. To edit Git ignore rules, select **Open Web UI** on the same app page; saving there updates the local Git checkout immediately and is committed during the next sync without restarting the add-on. The Git Ignore Editor saves its rules directly as `/config/gitignore`. This is a user-managed Home Assistant configuration file: it persists across add-on updates and the add-on never overwrites it when it already exists. Git metadata remains in the add-on’s persistent `/data` area. The add-on uses the rules when building an isolated Git index from `/homeassistant`; it does not modify or clean files in `/config`. The Web UI also shows the most recent sync check, the timestamp of the latest commit in the local backup checkout, an **Open private backup repository** button when a GitHub backup remote is configured, and a **Diagnostics** section for viewing or downloading selected add-on logs. Use **Clear local Git cache** to discard the local clone and any unpushed local commits; the next sync downloads the backup repository again. The configured ignore rules apply to paths read from `/homeassistant` before they are placed in a commit.
 
 > **Security note:** Keep `homeassistant/secrets.yaml` in `gitignore` unless you fully understand the implications and use a private repository. Git ignore rules do not remove files that were committed previously; remove those files and their history separately if needed.
 

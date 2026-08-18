@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.5.0
+
+- Corrected Home Assistant mount paths: the Home Assistant configuration source is `/homeassistant`, while the persistent add-on configuration folder is `/config`.
+- The visible user-managed ignore file is now `/config/gitignore` and is shared directly by the editor and sync process.
+
 ## 3.4.2
 
 - Fixed the `homeassistant_config` map by explicitly mounting it at `/config` inside the add-on container.
