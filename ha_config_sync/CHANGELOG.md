@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 1.7.4
+
+- Updated the displayed add-on repository maintainer to `ma-world`.
+
 ## 1.7.3
 
 - Added an in-app Documentation tab containing the add-on README.
