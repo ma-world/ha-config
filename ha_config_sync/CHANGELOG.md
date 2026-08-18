@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 1.7.3
+
+- Added an in-app Documentation tab containing the add-on README.
+
 ## 1.7.2
 
 - Fixed the add-on information-page link to point to the public HA Config Sync repository.
