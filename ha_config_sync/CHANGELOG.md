@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 2.0.2
+
+- Fixed persistent Git ignore storage by maintaining a compatibility copy in the add-on `/data` folder and synchronizing it with Home Assistant add-on configuration storage.
+- The web editor now saves to its writable persistent location immediately, so saved changes remain visible after reloading the editor.
+
 ## 2.0.1
 
 - Fixed ignore enforcement: Git now removes ignored paths from the snapshot before staging, without attempting an unreliable rsync filter translation.

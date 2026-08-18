@@ -5,8 +5,11 @@ set -Eeuo pipefail
 readonly CONFIG_DIR=/config
 readonly WORK_DIR=/data/repository
 readonly SNAPSHOT_DIR="${WORK_DIR}/homeassistant"
+readonly ADDON_SLUG=ha_config_sync
 readonly ADDON_CONFIG_DIR=/addon_configs/${HOSTNAME}
-readonly GITIGNORE_FILE=${ADDON_CONFIG_DIR}/gitignore
+readonly ADDON_CONFIG_GITIGNORE=${ADDON_CONFIG_DIR}/gitignore
+readonly LEGACY_GITIGNORE_FILE=/data/gitignore
+readonly GITIGNORE_FILE=${ADDON_CONFIG_GITIGNORE}
 readonly STATUS_FILE=/data/sync-status.json
 readonly ADDON_OPTIONS_FILE=/data/options.json
 
@@ -36,11 +39,16 @@ if [[ -z "${github_token}" ]]; then
 fi
 
 # Persist the ignore rules in Home Assistant's add-on configuration storage.
-# Unlike /data, this path is intended for user-managed add-on files.
+# The primary path follows Home Assistant's official addon_config mapping.
+# A compatibility copy is maintained in /data for older installs and for tools
+# that expose only /data to the add-on web process.
 mkdir -p "${ADDON_CONFIG_DIR}"
 chmod 700 "${ADDON_CONFIG_DIR}"
-if [[ ! -f "${GITIGNORE_FILE}" ]]; then
-  cat >"${GITIGNORE_FILE}" <<'GITIGNORE'
+if [[ ! -f "${ADDON_CONFIG_GITIGNORE}" && -s "${LEGACY_GITIGNORE_FILE}" ]]; then
+  cp "${LEGACY_GITIGNORE_FILE}" "${ADDON_CONFIG_GITIGNORE}"
+fi
+if [[ ! -f "${ADDON_CONFIG_GITIGNORE}" ]]; then
+  cat >"${ADDON_CONFIG_GITIGNORE}" <<'GITIGNORE'
 # Runtime and generated Home Assistant data
 homeassistant/home-assistant_v2.db*
 homeassistant/*.log
@@ -60,8 +68,12 @@ homeassistant/esphome/.esphome/
 homeassistant/zigbee2mqtt/database.db*
 homeassistant/zigbee2mqtt/logs/
 GITIGNORE
-  chmod 600 "${GITIGNORE_FILE}"
 fi
+chmod 600 "${ADDON_CONFIG_GITIGNORE}"
+# Keep a visible and persistent compatibility copy in the add-on data folder.
+cp "${ADDON_CONFIG_GITIGNORE}" "${LEGACY_GITIGNORE_FILE}"
+chmod 600 "${LEGACY_GITIGNORE_FILE}"
+
 
 askpass_file=''
 web_pid=''

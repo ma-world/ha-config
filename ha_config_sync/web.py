@@ -9,7 +9,10 @@ import subprocess
 from urllib.parse import parse_qs, urlparse
 
 ADDON_CONFIG_DIR = Path("/addon_configs") / os.getenv("HOSTNAME", "ha_config_sync")
-GITIGNORE_FILE = ADDON_CONFIG_DIR / "gitignore"
+ADDON_CONFIG_GITIGNORE_FILE = ADDON_CONFIG_DIR / "gitignore"
+# Keep the editor state under /data too. This is guaranteed to be writable by
+# every add-on and is synchronized to addon_configs by the sync process.
+GITIGNORE_FILE = Path("/data/gitignore")
 STATUS_FILE = Path("/data/sync-status.json")
 OPTIONS_FILE = Path("/data/options.json")
 REPOSITORY_DIR = Path("/data/repository")
@@ -79,7 +82,7 @@ PAGE = """<!doctype html>
     <div class="status-item"><span class="status-label">Last commit with changes</span><span class="status-value">{last_commit}</span></div>
   </div>
   {backup_repository_link}
-  <p>These rules are stored in the Home Assistant add-on configuration folder and are applied while copying files as well as before Git commits. They are also copied to <code>.gitignore</code> in the private backup repository. The editor shows 15 lines and scrolls for longer rule sets.</p>
+  <p>These rules are saved immediately in the add-on's persistent data and synchronized to the Home Assistant add-on configuration folder during the next sync. They are applied before Git commits and are also copied to <code>.gitignore</code> in the private backup repository. The editor shows 15 lines and scrolls for longer rule sets.</p>
   {secrets_warning}
   <p><strong>Security:</strong> Keep <code>homeassistant/secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
   <form method="post" action="save">
@@ -146,8 +149,13 @@ def read_rules() -> str:
     if saved_rules.strip():
         return saved_rules
 
+    try:
+        addon_config_rules = ADDON_CONFIG_GITIGNORE_FILE.read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        addon_config_rules = ""
+
     repository_rules = repository_gitignore()
-    rules = repository_rules or DEFAULT_RULES
+    rules = addon_config_rules or repository_rules or DEFAULT_RULES
     GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
     GITIGNORE_FILE.parent.chmod(0o700)
     GITIGNORE_FILE.write_text(rules, encoding="utf-8")
@@ -263,6 +271,15 @@ class Handler(BaseHTTPRequestHandler):
             GITIGNORE_FILE.parent.chmod(0o700)
             GITIGNORE_FILE.write_text(rules, encoding="utf-8")
             GITIGNORE_FILE.chmod(0o600)
+            try:
+                ADDON_CONFIG_GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+                ADDON_CONFIG_GITIGNORE_FILE.parent.chmod(0o700)
+                ADDON_CONFIG_GITIGNORE_FILE.write_text(rules, encoding="utf-8")
+                ADDON_CONFIG_GITIGNORE_FILE.chmod(0o600)
+            except OSError:
+                # /data remains the canonical editor location if addon_configs
+                # is temporarily unavailable to the ingress web process.
+                pass
             # Apply the saved editor content immediately to the local clone as
             # well. This makes a reload show the saved value even before the
             # next scheduled synchronization.
