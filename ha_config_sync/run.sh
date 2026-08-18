@@ -6,6 +6,7 @@ readonly CONFIG_DIR=/config
 readonly GIT_METADATA_DIR=/data/git
 readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
+readonly SYNC_DEBUG_LOG=/data/sync-debug.log
 readonly GITIGNORE_FILE=/config/ha_config_sync.gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
 
@@ -101,6 +102,20 @@ safe_git() {
   git --git-dir="${GIT_METADATA_DIR}" --work-tree="${CONFIG_DIR}" "$@"
 }
 
+debug_log() {
+  local message="$1"
+  local timestamp
+  timestamp="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+  printf '%s %s\n' "${timestamp}" "${message}" >>"${SYNC_DEBUG_LOG}"
+  chmod 600 "${SYNC_DEBUG_LOG}"
+  # Keep at most the latest 512 KiB without relying on external log rotation.
+  if (( $(wc -c < "${SYNC_DEBUG_LOG}") > 524288 )); then
+    tail -c 524288 "${SYNC_DEBUG_LOG}" >"${SYNC_DEBUG_LOG}.tmp"
+    mv "${SYNC_DEBUG_LOG}.tmp" "${SYNC_DEBUG_LOG}"
+    chmod 600 "${SYNC_DEBUG_LOG}"
+  fi
+}
+
 write_status() {
   local status_key="$1"
   local timestamp
@@ -192,8 +207,12 @@ rebuild_index_from_config() {
 }
 
 sync_configuration() {
+  debug_log "sync started; repository=${repository_url}; branch=${branch}; ignore_file=${GITIGNORE_FILE}"
   write_status last_check
-  verify_private_repository || return 1
+  if ! verify_private_repository; then
+    debug_log 'sync stopped: private repository verification failed'
+    return 1
+  fi
 
   mkdir -p "${GIT_METADATA_DIR}"
   if [[ ! -f "${GIT_METADATA_DIR}/HEAD" ]]; then
@@ -215,6 +234,7 @@ sync_configuration() {
   # "couldn't find remote ref" when a newly created private repository has no
   # first commit yet; that empty state is initialized safely below.
   if ! git --git-dir="${GIT_METADATA_DIR}" fetch --prune origin; then
+    debug_log 'sync stopped: remote fetch failed'
     bashio::log.warning 'Remote repository could not be fetched; the next run will retry.'
     return 1
   fi
@@ -233,6 +253,7 @@ sync_configuration() {
   new_tree="$(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" write-tree)"
 
   if [[ "${new_tree}" == "${parent_tree}" ]]; then
+    debug_log 'sync completed: no configuration changes detected'
     bashio::log.info 'No configuration changes to sync.'
     return 0
   fi
@@ -242,11 +263,13 @@ sync_configuration() {
   git --git-dir="${GIT_METADATA_DIR}" update-ref "refs/heads/${branch}" "${new_commit}" "${parent_commit}"
 
   if ! git --git-dir="${GIT_METADATA_DIR}" push origin "refs/heads/${branch}:refs/heads/${branch}"; then
+    debug_log "sync push failed; local_commit=${new_commit}"
     bashio::log.error 'Configuration commit was created locally, but the push failed. The next scheduled sync will retry.'
     return 1
   fi
 
   write_status last_commit
+  debug_log "sync completed successfully; commit=${new_commit}"
   bashio::log.info 'Configuration was committed and pushed successfully.'
 }
 

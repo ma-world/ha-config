@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.4.0
+
+- Added a Diagnostics section to the Web UI with log previews and secure view/download links for selected `/data` diagnostic logs.
+- Added persistent sync diagnostic logging with rotation for easier troubleshooting.
+
 ## 3.3.0
 
 - Moved the user-managed Git ignore file back to `/config/ha_config_sync.gitignore`, which persists across add-on updates.

@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, urlparse
 GITIGNORE_FILE = Path("/config/ha_config_sync.gitignore")
 STATUS_FILE = Path("/data/sync-status.json")
 WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")
+SYNC_DEBUG_LOG = Path("/data/sync-debug.log")
 OPTIONS_FILE = Path("/data/options.json")
 REPOSITORY_DIR = Path("/data/repository")
 ADDON_VERSION = os.getenv("ADDON_VERSION", "unknown")
@@ -60,12 +61,17 @@ PAGE = """<!doctype html>
     .notice { padding: 10px 12px; border-radius: 6px; background: #d9f5e5; color: #095a31; }
     .warning { padding: 10px 12px; border-radius: 6px; background: #fff1c2; color: #6a4600; line-height: 1.5; }
     .error { padding: 10px 12px; border-radius: 6px; background: #ffd9d9; color: #7a0000; line-height: 1.5; }
+    .logs { margin-top: 28px; padding-top: 20px; border-top: 1px solid #c7cdd4; }
+    .log-links { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+    .log-link { display: inline-block; padding: 8px 12px; border-radius: 5px; background: #37474f; color: #fff; font-weight: 700; text-decoration: none; }
+    .log-link:hover { background: #455a64; }
+    pre { max-height: 22em; overflow: auto; padding: 12px; border: 1px solid #89939e; border-radius: 6px; background: #151a1f; color: #ecf1f5; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
     .status { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin: 16px 0; }
     .status-item { padding: 12px; border: 1px solid #c7cdd4; border-radius: 6px; }
     .status-label { display: block; font-size: .85rem; color: #5e6b76; }
     .status-value { display: block; margin-top: 4px; font-weight: 700; }
     code { background: #e8ebef; padding: 2px 4px; border-radius: 3px; }
-    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .warning { background: #4a3612; color: #ffe2a3; } .error { background: #4a1717; color: #ffb8b8; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } .repository-link { background: #455a64; color: #fff; } .repository-link:hover { background: #546e7a; } .danger-button { background: #c62828; } .danger-button:hover { background: #b71c1c; } code { background: #343d46; } }
+    @media (prefers-color-scheme: dark) { body { background: #101418; color: #ecf1f5; } section { background: #20262c; } textarea { background: #151a1f; color: #ecf1f5; } .notice { background: #153d29; color: #bff5d3; } .warning { background: #4a3612; color: #ffe2a3; } .error { background: #4a1717; color: #ffb8b8; } .logs { border-color: #48535e; } .log-link { background: #455a64; color: #fff; } .log-link:hover { background: #546e7a; } .status-item { border-color: #48535e; } .status-label, .metadata { color: #b5c0c9; } a { color: #4fc3f7; } .repository-link { background: #455a64; color: #fff; } .repository-link:hover { background: #546e7a; } .danger-button { background: #c62828; } .danger-button:hover { background: #b71c1c; } code { background: #343d46; } }
   </style>
 </head>
 <body>
@@ -90,6 +96,18 @@ PAGE = """<!doctype html>
   <form method="post" action="clear-cache" onsubmit="return confirm('Clear the local Git cache? Unpushed local commits will be discarded. The next sync will download the repository again.');">
     <button class="danger-button" type="submit">Clear local Git cache</button>
   </form>
+  <section class="logs">
+    <h2>Diagnostics</h2>
+    <p>These are the selected diagnostic logs stored in the add-on’s persistent <code>/data</code> directory. Git metadata is never exposed here.</p>
+    <div class="log-links">
+      <a class="log-link" href="sync-log" target="_blank">View sync log</a>
+      <a class="log-link" href="sync-log?download=1">Download sync log</a>
+      <a class="log-link" href="editor-log" target="_blank">View editor log</a>
+      <a class="log-link" href="editor-log?download=1">Download editor log</a>
+    </div>
+    <h3>Latest sync log</h3>
+    <pre>{sync_log_preview}</pre>
+  </section>
 </section></main>
 </body></html>"""
 
@@ -102,6 +120,35 @@ def debug_log(message: str) -> None:
         WEB_DEBUG_LOG.chmod(0o600)
     except OSError:
         pass
+
+
+MAX_LOG_BYTES = 256 * 1024
+
+
+def read_log(path: Path) -> str:
+    try:
+        with path.open("rb") as log_file:
+            log_file.seek(0, 2)
+            size = log_file.tell()
+            log_file.seek(max(0, size - MAX_LOG_BYTES))
+            content = log_file.read().decode("utf-8", errors="replace")
+        prefix = "[Showing the last 256 KiB]\n" if size > MAX_LOG_BYTES else ""
+        return prefix + content
+    except FileNotFoundError:
+        return "No diagnostic log has been created yet."
+    except OSError as error:
+        return f"Unable to read diagnostic log: {error}"
+
+
+def serve_log(handler: BaseHTTPRequestHandler, path: Path, download: bool) -> None:
+    content = read_log(path).encode("utf-8")
+    handler.send_response(HTTPStatus.OK)
+    handler.send_header("Content-Type", "text/plain; charset=utf-8")
+    if download:
+        handler.send_header("Content-Disposition", f'attachment; filename="{path.name}"')
+    handler.send_header("Content-Length", str(len(content)))
+    handler.end_headers()
+    handler.wfile.write(content)
 
 
 def html_escape(value: str) -> str:
@@ -230,11 +277,18 @@ def read_status() -> dict[str, str]:
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        path = urlparse(self.path).path.rstrip("/") or "/"
+        parsed_url = urlparse(self.path)
+        path = parsed_url.path.rstrip("/") or "/"
+        query = parse_qs(parsed_url.query)
+        if path == "/sync-log":
+            serve_log(self, SYNC_DEBUG_LOG, "download" in query)
+            return
+        if path == "/editor-log":
+            serve_log(self, WEB_DEBUG_LOG, "download" in query)
+            return
         if path != "/":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
-        query = urlparse(self.path).query
         if "saved=1" in query:
             message = '<p class="notice">Ignore rules saved in /config. They will be applied during the next sync.</p>'
         elif "cache-cleared=1" in query:
@@ -251,6 +305,7 @@ class Handler(BaseHTTPRequestHandler):
                      .replace("{rules}", html_escape(rules))
                      .replace("{last_check}", html_escape(status["last_check"]))
                      .replace("{last_commit}", html_escape(status["last_commit"]))
+                     .replace("{sync_log_preview}", html_escape(read_log(SYNC_DEBUG_LOG)))
                      .replace("{version}", html_escape(ADDON_VERSION))
                      .replace("{project_url}", PROJECT_URL))
         self.send_response(HTTPStatus.OK)
