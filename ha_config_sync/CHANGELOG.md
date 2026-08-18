@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.6.0
+
+- Removed the unreliable ingress-based Git Ignore Editor save operation.
+- The Web UI now shows the active ignore-file content and directs users to edit the persistent `/config/gitignore` file with File Editor or Studio Code Server.
+
 ## 3.5.2
 
 - Fixed the ingress-relative editor save endpoint and added request diagnostics plus a form-encoded fallback for save requests.
