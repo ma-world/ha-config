@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 readonly CONFIG_DIR=/config
-readonly ADDON_CONFIG_DIR=/addon_configs/${HOSTNAME}
+readonly ADDON_CONFIG_DIR=/addon_configs/080264f0-ha-config-sync
 readonly GIT_METADATA_DIR=/data/git
 readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json

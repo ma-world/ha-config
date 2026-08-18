@@ -8,7 +8,7 @@ import os
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
-ADDON_CONFIG_DIR = Path("/addon_configs") / os.getenv("HOSTNAME", "ha_config_sync")
+ADDON_CONFIG_DIR = Path("/addon_configs/080264f0-ha-config-sync")
 GITIGNORE_FILE = ADDON_CONFIG_DIR / "gitignore"
 STATUS_FILE = Path("/data/sync-status.json")
 WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")
