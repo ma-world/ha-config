@@ -1,7 +1,7 @@
 name: HA Config Sync
-version: "3.8.1"
+version: "3.9.0"
 slug: ha_config_sync
-description: Copies selected Home Assistant configuration to Git and pushes it. To edit Git ignore rules, select Open Web UI.
+description: Backs up Home Assistant configuration to Git. Open Web UI for status, active rule preview, logs, cache reset, and the repository link.
 url: https://github.com/ma-world/ha-config
 arch:
   - aarch64
@@ -16,7 +16,7 @@ ingress: true
 ingress_port: 8099
 ingress_stream: true
 panel_icon: mdi:file-document-edit-outline
-panel_title: Git Ignore Editor
+panel_title: HA Config Sync Status
 panel_admin: false
 map:
   - homeassistant_config:rw

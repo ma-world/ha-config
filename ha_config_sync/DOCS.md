@@ -1,50 +1,57 @@
 # Home Assistant Configuration Sync
 
-This is a **public Home Assistant add-on repository**. The add-on reads the mounted Home Assistant `/homeassistant` directory, creates a Git commit when changes are detected, and pushes it to the Git repository you configure. Git metadata is isolated inside the add-on; `/config` is never used for Git cleanup or checkout operations.
+This is a **public Home Assistant add-on repository**. The add-on backs up Home Assistant configuration to a private Git repository. It runs entirely inside Home Assistant.
 
-1. The add-on starts automatically when Home Assistant starts.
-2. It runs one sync immediately, then repeats at the interval configured in the add-on settings (four hours by default).
-3. It stores the Home Assistant `/config` files at the root of the configured Git repository and pushes changes to the configured branch.
+## Architecture
+
+- **Home Assistant configuration source:** `/homeassistant`
+- **Git metadata and diagnostics:** `/data`
+- **Web UI:** status, active rule preview, logs, cache reset, and repository link
+
+The add-on treats `/homeassistant` as a read-only source tree. It does not run Git cleanup, checkout, restore, or reset operations against Home Assistant configuration files.
 
 ## Initial setup
 
-1. Add this repository in Home Assistant under **Settings → Add-ons → Add-on Store → Repositories**.
-2. Install the **HA Config Sync** add-on.
-3. In the add-on configuration, set `repository_url` to your private Git repository, for example:
+1. Add this repository in Home Assistant under **Settings → Apps → App Store → Repositories**.
+2. Install **HA Config Sync**.
+3. Set `repository_url` to your **private** GitHub repository, for example:
 
    ```text
    https://github.com/<YOUR USER NAME>/homeassistant-config-files.git
    ```
 
-4. Create a GitHub fine-grained personal access token with **Contents: Read and write** access to that backup repository, then enter it as `github_token` in the add-on configuration. The add-on also uses it to verify the repository visibility before every sync. The token is stored only in the add-on configuration and is never committed to Git.
-5. Set `sync_interval_hours` to the desired interval. The allowed range is 1 to 168 hours; the default is 4.
-6. To edit Git ignore rules, open the **HA Config Sync** app page and select **Open Web UI**. This opens a dedicated multi-line editor. The editor has 15 visible lines, scrolls for longer rule sets, and writes the rules as `.gitignore` in your backup repository.
-7. Start the add-on. If the selected private repository is empty, the add-on initializes its configured branch with a README before copying any Home Assistant files. It then performs the initial sync and remains active for subsequent scheduled syncs.
+4. Create a GitHub fine-grained personal access token with **Contents: Read and write** access to that repository. Enter it as `github_token` in the app configuration.
+5. Set `sync_interval_hours` between 1 and 168 hours. The default is 4.
+6. Start the add-on. It syncs immediately and then repeats at the configured interval.
 
-## Included files
+If the selected private repository is empty, the add-on initializes its configured branch before the first configuration sync.
 
-The add-on backs up the mounted Home Assistant `/homeassistant` directory. External add-on data directories outside `/config` are not included.
+## What is backed up
 
-Before copying or pushing any configuration data, the add-on checks the GitHub API and proceeds only if the target repository is private. If visibility cannot be verified or the repository is public, it writes an error to the add-on log and does not perform a backup. If the private repository is empty, it creates and pushes an English README that identifies it as a backup destination for this add-on, then continues with the normal sync.
+The add-on builds an isolated Git index from the mounted Home Assistant configuration source at `/homeassistant` and pushes changes to the configured branch.
 
-Runtime data, databases, logs, authentication data, tokens, and `secrets.yaml` are excluded by default. This reduces the risk of committing credentials to Git. The Git Ignore Editor warns if its `secrets.yaml` rule and the explicit `include_secrets` option do not match. Removing the ignore rule alone never enables secret backups; you must also explicitly enable `include_secrets` in the add-on configuration. Use a private backup repository if you do.
+External add-on data outside `/homeassistant` is not included.
 
-## Changing the interval or Git ignore rules
+## Git ignore rules
 
-Open the **HA Config Sync** app page to change `sync_interval_hours`. To inspect the active Git ignore rules, select **Open Web UI** on the same app page. To change the rules, edit `/addon_configs/XXXXXXX_ha_config_sync/gitignore` with File Editor or Studio Code Server; the add-on reads the file during the next sync without requiring a restart. The Git Ignore page displays the active rules from `/addon_configs/XXXXXXX_ha_config_sync/gitignore`. Edit that file directly with File Editor or Studio Code Server. This is a user-managed Home Assistant configuration file: it persists across add-on updates and the add-on never overwrites it when it already exists. Git metadata remains in the add-on’s persistent `/data` area. The add-on uses the rules when building an isolated Git index from `/homeassistant`; it does not modify or clean files in `/config`. The Web UI also shows the most recent sync check, the timestamp of the latest commit in the local backup checkout, an **Open private backup repository** button when a GitHub backup remote is configured, and a **Diagnostics** section for viewing or downloading selected add-on logs. Use **Clear local Git cache** to discard the local clone and any unpushed local commits; the next sync downloads the backup repository again. The configured ignore rules apply to paths read from `/homeassistant` before they are placed in a commit.
+The Web UI displays the active Git ignore rules used for synchronization. Rules are stored in the add-on’s persistent data area and are not overwritten if an existing rule file is present.
 
-> **Security note:** Keep `homeassistant/secrets.yaml` in `gitignore` unless you fully understand the implications and use a private repository. Git ignore rules do not remove files that were committed previously; remove those files and their history separately if needed.
+The default rules exclude runtime data, logs, credentials, selected large media files, community frontend assets, ESPHome build artifacts, and common Zigbee2MQTT database/log files.
 
-The add-on log shows the result of each sync.
+> **Security note:** Keep `secrets.yaml` ignored unless you fully understand the implications and use a private repository. Git ignore rules do not remove files already committed in Git history.
 
-## In-app documentation
+## Web UI and diagnostics
 
-The same documentation is available inside Home Assistant on the **Documentation** tab of the add-on page. It is maintained in [`ha_config_sync/DOCS.md`](ha_config_sync/DOCS.md).
+Open **HA Config Sync → Open Web UI** for:
+
+- last sync check and last commit time,
+- active Git ignore rule preview,
+- link to the private backup repository,
+- sync log preview and download,
+- **Clear local Git cache**.
+
+**Clear local Git cache** removes only the add-on’s local Git metadata, index, and transient snapshots from `/data`. It does not change `/homeassistant` or the remote GitHub repository. Locally created commits that have not been pushed are discarded.
 
 ## Changelog
 
-Home Assistant displays the release notes from [`ha_config_sync/CHANGELOG.md`](ha_config_sync/CHANGELOG.md) whenever an add-on update is available. Add an entry there before every future version bump.
-
-## Safety note
-
-Version 3.1.0 uses `/config` as a read-only Git source tree only. Git metadata and indexes remain isolated in the add-on, and the add-on must never run Git cleanup commands directly against Home Assistant configuration files.
+Home Assistant displays the release notes from [`ha_config_sync/CHANGELOG.md`](ha_config_sync/CHANGELOG.md) whenever an add-on update is available.

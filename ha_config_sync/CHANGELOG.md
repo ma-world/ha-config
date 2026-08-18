@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.9.0
+
+- Updated the app description, Web UI labels, and documentation to reflect the current architecture.
+- The Web UI is now described as a status and diagnostics interface with an active rule preview, not a Git ignore editor.
+
 ## 3.8.1
 
 - Removed the unsupported `addon_config` mount requirement so the add-on can start reliably.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Authenticated Home Assistant ingress panel for editing Git ignore rules."""
+"""Authenticated Home Assistant ingress panel for HA Config Sync status and diagnostics."""
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -43,7 +43,7 @@ PAGE = """<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Git Ignore Editor</title>
+  <title>HA Config Sync Status</title>
   <style>
     :root { color-scheme: light dark; font-family: system-ui, -apple-system, sans-serif; }
     body { margin: 0; background: #f4f6f8; color: #1f2933; }
@@ -81,7 +81,7 @@ PAGE = """<!doctype html>
 <body>
 <main><section>
   <div class="header">
-    <h1>Git Ignore Editor</h1>
+    <h1>HA Config Sync Status</h1>
     <span class="metadata">Version {version} · <a href="{project_url}" target="_blank" rel="noopener noreferrer">GitHub project</a></span>
   </div>
   {notice}
@@ -90,14 +90,12 @@ PAGE = """<!doctype html>
     <div class="status-item"><span class="status-label">Last commit with changes</span><span class="status-value">{last_commit}</span></div>
   </div>
   {backup_repository_link}
-  <p>The active Git ignore rules are stored in the add-on’s persistent <code>/data</code> area. The add-on treats <code>/homeassistant</code> as a read-only source tree and stores Git metadata only inside its persistent <code>/data</code> area.</p>
+  <p>Home Assistant configuration source: <code>/homeassistant</code>. Git metadata and diagnostics: <code>/data</code>.</p>
   {secrets_warning}
   <p><strong>Security:</strong> Keep <code>secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
   <section class="logs">
-    <h2>Git ignore file</h2>
-    <p>Edit this user-managed file directly with File Editor or Studio Code Server:</p>
-    <pre>/addon_configs/XXXXXXX_ha_config_sync/gitignore</pre>
-    <p>Replace <code>XXXXXXX</code> with your installation-specific add-on ID. The active content is shown below.</p>
+    <h2>Active Git ignore rules</h2>
+    <p>This is a read-only preview of the rules currently applied during synchronization.</p>
     <pre>{rules}</pre>
   </section>
   <form method="post" action="clear-cache" onsubmit="return confirm('Clear the local Git cache? Unpushed local commits will be discarded. The next sync will download the repository again.');">
@@ -105,7 +103,7 @@ PAGE = """<!doctype html>
   </form>
   <section class="logs">
     <h2>Diagnostics</h2>
-    <p>These are the selected diagnostic logs stored in the add-on’s persistent <code>/data</code> directory. Git metadata is never exposed here.</p>
+    <p>These are selected diagnostic logs from the add-on’s persistent <code>/data</code> directory. Git metadata is never exposed here.</p>
     <div class="log-links">
       <a class="log-link" href="sync-log" target="_blank">View sync log</a>
       <a class="log-link" href="sync-log?download=1">Download sync log</a>
