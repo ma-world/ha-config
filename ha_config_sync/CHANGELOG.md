@@ -2,6 +2,13 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.1.0
+
+- Added a safe direct `/config` source-tree mode: Git metadata and indexes are isolated under `/data`, while `/config` is treated as read-only.
+- The add-on does not use `git reset`, `git clean`, `git checkout`, `git restore`, or any other worktree-mutating operation against `/config`.
+- Moved the editable ignore file to `/config/ha_config_sync.gitignore`, where it is visible in File Editor and Studio Code Server.
+- This version backs up `/config` only; it does not include external add-on data such as Zigbee2MQTT or ESPHome directories outside `/config`.
+
 ## 3.0.1
 
 - Emergency rollback of the unsafe direct `/config` Git worktree implementation introduced in 3.0.0.
