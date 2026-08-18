@@ -94,7 +94,8 @@ PAGE = """<!doctype html>
     <h2>Active Git ignore rules</h2>
     <p>Edit this persistent user-managed file with File Editor or Studio Code Server:</p>
     <pre>{host_gitignore_path}</pre>
-    <p>Set this path in the app configuration as <code>gitignore_host_path</code> if your installation uses a different host location. This read-only preview shows the exact rules currently applied during synchronization.</p>
+    <p>{addon_config_mount_status}</p>
+    <p>This read-only preview shows the exact rules currently applied during synchronization.</p>
     <pre>{rules}</pre>
   </section>
   <form method="post" action="clear-cache" onsubmit="return confirm('Clear the local Git cache? Unpushed local commits will be discarded. The next sync will download the repository again.');">
@@ -160,6 +161,16 @@ def serve_log(handler: BaseHTTPRequestHandler, path: Path, download: bool) -> No
 def html_escape(value: str) -> str:
     return (value.replace("&", "&amp;").replace("<", "&lt;")
                  .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def addon_config_mount_status() -> str:
+    if not Path("/config").is_dir():
+        return "Diagnostic mode: /config is not mounted in this container. The active rules still use /data/gitignore."
+    try:
+        entries = ", ".join(sorted(child.name for child in Path("/config").iterdir())) or "(empty)"
+    except OSError as error:
+        entries = f"unreadable: {error}"
+    return f"Diagnostic mode: /config is mounted. Entries: {entries}. The active rules still use /data/gitignore until the mount is verified."
 
 
 def host_gitignore_path() -> str:
@@ -311,6 +322,7 @@ class Handler(BaseHTTPRequestHandler):
                      .replace("{backup_repository_link}", backup_repository_link())
                      .replace("{rules}", html_escape(rules))
                      .replace("{host_gitignore_path}", html_escape(host_gitignore_path()))
+                     .replace("{addon_config_mount_status}", html_escape(addon_config_mount_status()))
                      .replace("{last_check}", html_escape(status["last_check"]))
                      .replace("{last_commit}", html_escape(status["last_commit"]))
                      .replace("{sync_log_preview}", html_escape(read_log(SYNC_DEBUG_LOG)))

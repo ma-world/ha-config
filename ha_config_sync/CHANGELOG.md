@@ -2,6 +2,17 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.2.0
+
+- Enabled `addon_config:rw` for an internal diagnostic iteration.
+- The active Git ignore file remains `/data/gitignore` during this iteration, so a missing `/config` mount cannot interrupt synchronization.
+- Startup and Web UI diagnostics report whether the Supervisor exposes the expected `/config` add-on configuration mount.
+
+## 4.1.1
+
+- Started a safe diagnostic iteration for the Supervisor `addon_config` mount.
+- The add-on requests `addon_config:rw` and records detailed `/config` mount diagnostics, while continuing to use `/data/gitignore` as the active rules file until the mount is confirmed.
+
 ## 4.1.0
 
 - Added the configurable `gitignore_host_path` app option for the visible host-side ignore-file location.

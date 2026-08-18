@@ -38,6 +38,10 @@ The add-on builds an isolated Git index from the mounted Home Assistant configur
 
 External add-on data outside `/homeassistant` is not included.
 
+> **Mount diagnostic note:** Version 4.1.1 requests the Supervisor-managed `addon_config` mount and logs whether it is available at `/config`. During this diagnostic step, the active Git ignore file remains `/data/gitignore` so a missing mount cannot stop synchronization.
+
+> **Internal diagnostic note:** Version 4.2.0 enables `addon_config:rw` to inspect whether the Supervisor provides `/config` in this environment. The active ignore file remains `/data/gitignore` during this step, so synchronization continues even if `/config` is unavailable.
+
 ## Git ignore rules
 
 The Web UI displays the active Git ignore rules used for synchronization. To change them, edit this persistent file with File Editor or Studio Code Server:

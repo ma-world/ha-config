@@ -8,6 +8,7 @@ readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
 readonly SYNC_DEBUG_LOG=/data/sync-debug.log
 readonly OPTIONS_FILE=/data/options.json
+readonly ADDON_CONFIG_MOUNT=/config
 readonly GITIGNORE_FILE=/data/gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
 
@@ -134,10 +135,16 @@ log_mount_diagnostics() {
   for path in /homeassistant /config /data; do
     if [[ -d "${path}" ]]; then
       debug_log "container directory ${path}: present ($(ls -ld "${path}" 2>/dev/null || true))"
+      debug_log "container directory ${path}: entries=$(ls -A "${path}" 2>/dev/null | tr '\n' ',' | sed 's/,$//' || true)"
     else
       debug_log "container directory ${path}: missing"
     fi
   done
+  if [[ -d "${ADDON_CONFIG_MOUNT}" ]]; then
+    debug_log "addon_config diagnostic: mount candidate is available at ${ADDON_CONFIG_MOUNT}; active ignore remains ${GITIGNORE_FILE} during this diagnostic release"
+  else
+    debug_log "addon_config diagnostic: mount candidate ${ADDON_CONFIG_MOUNT} is unavailable; active ignore remains ${GITIGNORE_FILE}"
+  fi
 
   debug_log "options file: ${OPTIONS_FILE}"
   if [[ -r "${OPTIONS_FILE}" ]]; then
@@ -260,7 +267,7 @@ rebuild_index_from_config() {
 }
 
 sync_configuration() {
-  debug_log "sync started; repository=${repository_url}; branch=${branch}; ignore_file=${GITIGNORE_FILE}"
+  debug_log "sync started; repository=${repository_url}; branch=${branch}; active_ignore_file=${GITIGNORE_FILE}; addon_config_candidate=${ADDON_CONFIG_MOUNT}"
   write_status last_check
   if ! verify_private_repository; then
     debug_log 'sync stopped: private repository verification failed'
