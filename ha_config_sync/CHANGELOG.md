@@ -2,6 +2,12 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.1.0
+
+- Added the configurable `gitignore_host_path` app option for the visible host-side ignore-file location.
+- The Web UI now displays that configured path instead of guessing an add-on slug from unavailable runtime metadata.
+- Startup diagnostics now record the configured host path and no longer log even a masked token fragment.
+
 ## 4.0.3
 
 - Added persistent startup mount diagnostics to `/data/sync-debug.log`, including container paths, relevant mountinfo entries, add-on configuration values, and the detected add-on slug.

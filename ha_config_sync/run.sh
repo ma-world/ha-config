@@ -17,6 +17,7 @@ git_name="$(bashio::config 'git_name')"
 git_email="$(bashio::config 'git_email')"
 github_token="$(bashio::config 'github_token')"
 sync_interval_hours="$(bashio::config 'sync_interval_hours')"
+gitignore_host_path="$(bashio::config 'gitignore_host_path')"
 
 if [[ -z "${repository_url}" ]]; then
   bashio::log.fatal 'repository_url must be configured.'
@@ -141,12 +142,13 @@ log_mount_diagnostics() {
   debug_log "options file: ${OPTIONS_FILE}"
   if [[ -r "${OPTIONS_FILE}" ]]; then
     option_slug="$(jq -r '.slug // "unknown"' "${OPTIONS_FILE}" 2>/dev/null || printf 'unknown')"
-    debug_log "detected add-on slug: ${option_slug}"
+    debug_log "options-file slug field: ${option_slug}"
     debug_log "configured repository_url: ${repository_url}"
     debug_log "configured branch: ${branch}"
     debug_log "configured git_name: ${git_name}"
     debug_log "configured git_email: ${git_email}"
-    debug_log "github_token: $(mask_value "${github_token}")"
+    debug_log 'github_token: [configured; value not logged]'
+    debug_log "configured gitignore host path: ${gitignore_host_path}"
   else
     debug_log 'options file is not readable'
   fi

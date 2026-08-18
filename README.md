@@ -22,7 +22,13 @@ The add-on treats `/homeassistant` as a read-only source tree. It does not run G
 
 4. Create a GitHub fine-grained personal access token with **Contents: Read and write** access to that repository. Enter it as `github_token` in the app configuration.
 5. Set `sync_interval_hours` between 1 and 168 hours. The default is 4.
-6. Start the add-on. It syncs immediately and then repeats at the configured interval.
+6. Set `gitignore_host_path` to the path you use to edit the persistent Git ignore file on the Home Assistant host. The default is:
+
+   ```text
+   /addon_configs/080264f0_ha_config_sync/gitignore
+   ```
+
+7. Start the add-on. It syncs immediately and then repeats at the configured interval.
 
 If the selected private repository is empty, the add-on initializes its configured branch before the first configuration sync.
 

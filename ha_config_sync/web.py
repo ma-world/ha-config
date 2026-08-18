@@ -94,7 +94,7 @@ PAGE = """<!doctype html>
     <h2>Active Git ignore rules</h2>
     <p>Edit this persistent user-managed file with File Editor or Studio Code Server:</p>
     <pre>{host_gitignore_path}</pre>
-    <p>This read-only preview shows the exact rules that are currently applied during synchronization.</p>
+    <p>Set this path in the app configuration as <code>gitignore_host_path</code> if your installation uses a different host location. This read-only preview shows the exact rules currently applied during synchronization.</p>
     <pre>{rules}</pre>
   </section>
   <form method="post" action="clear-cache" onsubmit="return confirm('Clear the local Git cache? Unpushed local commits will be discarded. The next sync will download the repository again.');">
@@ -164,12 +164,10 @@ def html_escape(value: str) -> str:
 
 def host_gitignore_path() -> str:
     try:
-        slug = json.loads(OPTIONS_FILE.read_text(encoding="utf-8")).get("slug", "")
+        configured_path = json.loads(OPTIONS_FILE.read_text(encoding="utf-8")).get("gitignore_host_path", "")
     except (FileNotFoundError, ValueError):
-        slug = ""
-    if slug:
-        return f"/addon_configs/{slug}/gitignore"
-    return "/data/gitignore (inside the add-on container)"
+        configured_path = ""
+    return configured_path or "Not configured"
 
 
 def backup_repository_url() -> str | None:
