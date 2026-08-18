@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.5.2
+
+- Fixed the ingress-relative editor save endpoint and added request diagnostics plus a form-encoded fallback for save requests.
+
 ## 3.5.1
 
 - Replaced the Git Ignore Editor’s form submission with a JSON save API to prevent ingress from dropping multi-line textarea content.

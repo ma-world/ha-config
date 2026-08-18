@@ -127,7 +127,7 @@ PAGE = """<!doctype html>
     status.className = "notice";
     status.textContent = `Saving ${rules.length} characters…`;
     try {
-      const response = await fetch("save-json", {
+      const response = await fetch("./save-json", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gitignore: rules }),
@@ -358,12 +358,20 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 payload = self.rfile.read(length)
-                data = json.loads(payload.decode("utf-8"))
-                rules = data.get("gitignore")
+                content_type = self.headers.get("Content-Type", "")
+                debug_log(f"editor save request received: {length} bytes; content_type={content_type!r}")
+                if not payload:
+                    raise ValueError("The browser sent an empty save request. Reload the Web UI and try again.")
+                if "application/json" in content_type:
+                    data = json.loads(payload.decode("utf-8"))
+                    rules = data.get("gitignore")
+                else:
+                    values = parse_qs(payload.decode("utf-8"), keep_blank_values=True)
+                    rules = values.get("gitignore", [None])[0]
                 if not isinstance(rules, str):
                     raise ValueError("gitignore must be a string")
             except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as error:
-                debug_log(f"editor JSON request rejected: {error}")
+                debug_log(f"editor save request rejected: {error}")
                 self.send_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": str(error)})
                 return
 
