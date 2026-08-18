@@ -56,8 +56,9 @@ GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 }
 
-# The visible ignore file is stored in the mounted Home Assistant add-on
-# configuration directory. Git metadata remains in the normal persistent /data.
+# The visible ignore file is stored in Home Assistant's mounted add-on
+# configuration directory. This stable directory name matches the add-on ID
+# assigned by the Supervisor; no file synchronization is required.
 mkdir -p "${ADDON_CONFIG_DIR}"
 chmod 700 "${ADDON_CONFIG_DIR}"
 if [[ ! -f "${GITIGNORE_FILE}" ]]; then
