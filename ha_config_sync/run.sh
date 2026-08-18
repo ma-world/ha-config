@@ -3,10 +3,11 @@
 set -Eeuo pipefail
 
 readonly CONFIG_DIR=/config
+readonly ADDON_CONFIG_DIR=/addon_configs/${HOSTNAME}
 readonly GIT_METADATA_DIR=/data/git
 readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
-readonly GITIGNORE_FILE=/config/ha_config_sync.gitignore
+readonly GITIGNORE_FILE=${ADDON_CONFIG_DIR}/gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
 
 repository_url="$(bashio::config 'repository_url')"
@@ -55,8 +56,10 @@ GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 }
 
-# This file is part of the user's Home Assistant configuration and is visible
-# in File Editor and Studio Code Server. It is never created through Git.
+# The visible ignore file is stored in the mounted Home Assistant add-on
+# configuration directory. Git metadata remains in the normal persistent /data.
+mkdir -p "${ADDON_CONFIG_DIR}"
+chmod 700 "${ADDON_CONFIG_DIR}"
 if [[ ! -f "${GITIGNORE_FILE}" ]]; then
   bashio::log.warning "Git ignore file not found; creating default at ${GITIGNORE_FILE}."
   create_default_gitignore

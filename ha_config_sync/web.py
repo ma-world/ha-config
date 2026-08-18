@@ -8,7 +8,8 @@ import os
 import subprocess
 from urllib.parse import parse_qs, urlparse
 
-GITIGNORE_FILE = Path("/config/ha_config_sync.gitignore")
+ADDON_CONFIG_DIR = Path("/addon_configs") / os.getenv("HOSTNAME", "ha_config_sync")
+GITIGNORE_FILE = ADDON_CONFIG_DIR / "gitignore"
 STATUS_FILE = Path("/data/sync-status.json")
 WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")
 OPTIONS_FILE = Path("/data/options.json")
@@ -80,7 +81,7 @@ PAGE = """<!doctype html>
     <div class="status-item"><span class="status-label">Last commit with changes</span><span class="status-value">{last_commit}</span></div>
   </div>
   {backup_repository_link}
-  <p>These rules are saved directly as <code>/config/ha_config_sync.gitignore</code>. The add-on treats <code>/config</code> as a read-only source tree and builds Git commits only from metadata stored inside the add-on. The editor shows 15 lines and scrolls for longer rule sets.</p>
+  <p>These rules are saved in the Home Assistant add-on configuration folder as <code>gitignore</code>. The add-on treats <code>/config</code> as a read-only source tree and stores Git metadata only inside its persistent <code>/data</code> area. The editor shows 15 lines and scrolls for longer rule sets.</p>
   {secrets_warning}
   <p><strong>Security:</strong> Keep <code>secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
   <form method="post" action="save">
@@ -151,6 +152,8 @@ def read_rules() -> tuple[str, str]:
 
     debug_log(f"editor found no rules in {GITIGNORE_FILE}; creating defaults")
     try:
+        GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        GITIGNORE_FILE.parent.chmod(0o700)
         GITIGNORE_FILE.write_text(DEFAULT_RULES, encoding="utf-8")
         GITIGNORE_FILE.chmod(0o600)
     except OSError as error:
@@ -268,6 +271,8 @@ class Handler(BaseHTTPRequestHandler):
             rules = rules.rstrip("\n") + "\n" if rules else ""
             debug_log(f"editor save requested: {len(rules)} bytes to {GITIGNORE_FILE}")
             try:
+                GITIGNORE_FILE.parent.mkdir(parents=True, exist_ok=True)
+                GITIGNORE_FILE.parent.chmod(0o700)
                 GITIGNORE_FILE.write_text(rules, encoding="utf-8")
                 GITIGNORE_FILE.chmod(0o600)
                 persisted = GITIGNORE_FILE.read_text(encoding="utf-8")

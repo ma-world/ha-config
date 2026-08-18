@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 3.2.0
+
+- Moved the visible Git ignore file to the mounted Home Assistant add-on configuration folder.
+- Kept Git metadata, index, status, and logs in the add-on’s normal persistent `/data` area.
+
 ## 3.1.7
 
 - Replaced the deprecated `config` map with `homeassistant_config`.
