@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.0.0
+
+- Removed the installation-specific hard-coded add-on configuration ID from the Git ignore path display.
+- The Web UI now derives and displays the host-side path from the Supervisor-provided add-on slug at runtime.
+
 ## 3.9.1
 
 - Restored use of the actual Supervisor-managed add-on configuration folder at `/addon_configs/080264f0_ha_config_sync` for the shared Git ignore file.

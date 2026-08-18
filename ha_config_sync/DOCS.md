@@ -37,7 +37,7 @@ External add-on data outside `/homeassistant` is not included.
 The Web UI displays the active Git ignore rules used for synchronization. To change them, edit this persistent file with File Editor or Studio Code Server:
 
 ```text
-/addon_configs/080264f0_ha_config_sync/gitignore
+/addon_configs/<ADDON_SLUG>/gitignore
 ```
 
 The add-on never overwrites an existing rule file during startup or update.

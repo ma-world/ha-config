@@ -7,8 +7,8 @@ readonly GIT_METADATA_DIR=/data/git
 readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
 readonly SYNC_DEBUG_LOG=/data/sync-debug.log
-readonly ADDON_CONFIG_DIR=/addon_configs/080264f0_ha_config_sync
-readonly GITIGNORE_FILE="${ADDON_CONFIG_DIR}/gitignore"
+readonly OPTIONS_FILE=/data/options.json
+readonly GITIGNORE_FILE=/data/gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
 
 repository_url="$(bashio::config 'repository_url')"
@@ -57,13 +57,9 @@ GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 }
 
-# The user-managed ignore file is stored in the Supervisor-managed add-on
-# configuration folder. It is preserved across add-on updates. Do not replace
-# an existing file; create defaults only when the file does not exist.
-if [[ ! -d "${ADDON_CONFIG_DIR}" ]]; then
-  bashio::log.fatal "Add-on configuration directory is not mounted: ${ADDON_CONFIG_DIR}."
-  exit 1
-fi
+# The user-managed ignore file is stored in persistent add-on data. The web
+# interface uses the Supervisor-provided slug from options.json to display a
+# portable host-side add-on configuration path for every installation.
 if [[ ! -e "${GITIGNORE_FILE}" ]]; then
   bashio::log.warning "Git ignore file not found; creating defaults at ${GITIGNORE_FILE}."
   create_default_gitignore

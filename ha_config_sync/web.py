@@ -10,8 +10,7 @@ import subprocess
 from urllib.parse import parse_qs, urlparse
 
 CONFIG_DIR = Path("/homeassistant")
-ADDON_CONFIG_DIR = Path("/addon_configs/080264f0_ha_config_sync")
-GITIGNORE_FILE = ADDON_CONFIG_DIR / "gitignore"
+GITIGNORE_FILE = Path("/data/gitignore")
 STATUS_FILE = Path("/data/sync-status.json")
 WEB_DEBUG_LOG = Path("/data/web-editor-debug.log")
 SYNC_DEBUG_LOG = Path("/data/sync-debug.log")
@@ -97,7 +96,7 @@ PAGE = """<!doctype html>
   <section class="logs">
     <h2>Active Git ignore rules</h2>
     <p>Edit this persistent user-managed file with File Editor or Studio Code Server:</p>
-    <pre>/addon_configs/080264f0_ha_config_sync/gitignore</pre>
+    <pre>{host_gitignore_path}</pre>
     <p>This read-only preview shows the exact rules that are currently applied during synchronization.</p>
     <pre>{rules}</pre>
   </section>
@@ -160,6 +159,16 @@ def serve_log(handler: BaseHTTPRequestHandler, path: Path, download: bool) -> No
 def html_escape(value: str) -> str:
     return (value.replace("&", "&amp;").replace("<", "&lt;")
                  .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def host_gitignore_path() -> str:
+    try:
+        slug = json.loads(OPTIONS_FILE.read_text(encoding="utf-8")).get("slug", "")
+    except (FileNotFoundError, ValueError):
+        slug = ""
+    if slug:
+        return f"/addon_configs/{slug}/gitignore"
+    return "/data/gitignore (inside the add-on container)"
 
 
 def backup_repository_url() -> str | None:
@@ -300,6 +309,7 @@ class Handler(BaseHTTPRequestHandler):
                      .replace("{secrets_warning}", secrets_warning(rules))
                      .replace("{backup_repository_link}", backup_repository_link())
                      .replace("{rules}", html_escape(rules))
+                     .replace("{host_gitignore_path}", html_escape(host_gitignore_path()))
                      .replace("{last_check}", html_escape(status["last_check"]))
                      .replace("{last_commit}", html_escape(status["last_commit"]))
                      .replace("{sync_log_preview}", html_escape(read_log(SYNC_DEBUG_LOG)))
