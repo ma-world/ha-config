@@ -2,6 +2,12 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.6.0
+
+- Updated deprecated Supervisor map names to `app_config:rw` and `all_app_configs:rw`.
+- Removed deprecated architecture entries; the app now declares only `aarch64` and `amd64`.
+- Updated current documentation and runtime terminology from add-ons to apps.
+
 ## 4.5.2
 
 - Fixed dynamic all-add-on-config mount discovery by making its discovered container path mutable instead of read-only.

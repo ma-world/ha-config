@@ -8,11 +8,11 @@ readonly INDEX_FILE=/data/index
 readonly STATUS_FILE=/data/sync-status.json
 readonly SYNC_DEBUG_LOG=/data/sync-debug.log
 readonly OPTIONS_FILE=/data/options.json
-readonly ADDON_CONFIG_DIR=/config
-readonly GITIGNORE_FILE="${ADDON_CONFIG_DIR}/gitignore"
+readonly APP_CONFIG_DIR=/config
+readonly GITIGNORE_FILE="${APP_CONFIG_DIR}/gitignore"
 readonly LEGACY_GITIGNORE_FILE=/data/gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
-ALL_ADDON_CONFIGS_DIR=
+ALL_APP_CONFIGS_DIR=
 
 repository_url="$(bashio::config 'repository_url')"
 branch="$(bashio::config 'branch')"
@@ -20,7 +20,7 @@ git_name="$(bashio::config 'git_name')"
 git_email="$(bashio::config 'git_email')"
 github_token="$(bashio::config 'github_token')"
 sync_interval_hours="$(bashio::config 'sync_interval_hours')"
-include_all_addon_configs="$(bashio::config 'include_all_addon_configs')"
+include_all_app_configs="$(bashio::config 'include_all_app_configs')"
 
 if [[ -z "${repository_url}" ]]; then
   bashio::log.fatal 'repository_url must be configured.'
@@ -73,8 +73,8 @@ GITIGNORE
 # The user-managed ignore file is stored in the Supervisor-managed add-on
 # configuration folder. It is shared with the host-visible path documented in
 # the Web UI and is never overwritten when it already exists.
-if [[ ! -d "${ADDON_CONFIG_DIR}" ]]; then
-  bashio::log.fatal "Add-on configuration directory is not mounted: ${ADDON_CONFIG_DIR}."
+if [[ ! -d "${APP_CONFIG_DIR}" ]]; then
+  bashio::log.fatal "Add-on configuration directory is not mounted: ${APP_CONFIG_DIR}."
   exit 1
 fi
 if [[ ! -e "${GITIGNORE_FILE}" && -f "${LEGACY_GITIGNORE_FILE}" ]]; then
@@ -124,11 +124,11 @@ safe_git() {
   git --git-dir="${GIT_METADATA_DIR}" --work-tree="${CONFIG_DIR}" "$@"
 }
 
-discover_all_addon_configs_mount() {
+discover_all_app_configs_mount() {
   local mount_line source_root
-  ALL_ADDON_CONFIGS_DIR=''
+  ALL_APP_CONFIGS_DIR=''
   if [[ ! -r /proc/self/mountinfo ]]; then
-    debug_log 'all_addon_configs mount discovery: /proc/self/mountinfo is not readable'
+    debug_log 'all_app_configs mount discovery: /proc/self/mountinfo is not readable'
     return 1
   fi
 
@@ -136,39 +136,39 @@ discover_all_addon_configs_mount() {
     source_root="$(printf '%s' "${mount_line}" | awk -F' - ' '{print $1}' | awk '{print $4}')"
     case "${source_root}" in
       /supervisor/app_configs)
-        ALL_ADDON_CONFIGS_DIR="$(printf '%s' "${mount_line}" | awk -F' - ' '{print $1}' | awk '{print $5}')"
-        debug_log "all_addon_configs mount discovery: source=${source_root}; container_target=${ALL_ADDON_CONFIGS_DIR}"
+        ALL_APP_CONFIGS_DIR="$(printf '%s' "${mount_line}" | awk -F' - ' '{print $1}' | awk '{print $5}')"
+        debug_log "all_app_configs mount discovery: source=${source_root}; container_target=${ALL_APP_CONFIGS_DIR}"
         return 0
         ;;
     esac
   done < /proc/self/mountinfo
 
-  debug_log 'all_addon_configs mount discovery: no /supervisor/app_configs root mount found'
+  debug_log 'all_app_configs mount discovery: no /supervisor/app_configs root mount found'
   return 1
 }
 
-add_all_addon_configs_to_index() {
-  if [[ "${include_all_addon_configs}" != 'true' ]]; then
-    debug_log 'all add-on configurations: disabled'
+add_all_app_configs_to_index() {
+  if [[ "${include_all_app_configs}" != 'true' ]]; then
+    debug_log 'all app configurations: disabled'
     return 0
   fi
-  if ! discover_all_addon_configs_mount || [[ -z "${ALL_ADDON_CONFIGS_DIR}" || ! -d "${ALL_ADDON_CONFIGS_DIR}" ]]; then
-    bashio::log.warning 'All add-on configurations are enabled, but the Supervisor all_addon_configs mount could not be found. Skipping them.'
-    debug_log 'all add-on configurations: enabled but no usable mount was discovered'
+  if ! discover_all_app_configs_mount || [[ -z "${ALL_APP_CONFIGS_DIR}" || ! -d "${ALL_APP_CONFIGS_DIR}" ]]; then
+    bashio::log.warning 'All app configurations are enabled, but the Supervisor all_app_configs mount could not be found. Skipping them.'
+    debug_log 'all app configurations: enabled but no usable mount was discovered'
     return 0
   fi
 
-  bashio::log.warning 'All add-on configurations are enabled. Ensure the destination repository remains private.'
-  debug_log "all add-on configurations: creating isolated snapshot from ${ALL_ADDON_CONFIGS_DIR}"
+  bashio::log.warning 'All app configurations are enabled. Ensure the destination repository remains private.'
+  debug_log "all app configurations: creating isolated snapshot from ${ALL_APP_CONFIGS_DIR}"
   rm -rf "${SNAPSHOT_DIR}/addon_configs"
   mkdir -p "${SNAPSHOT_DIR}/addon_configs"
-  rsync -a --delete "${ALL_ADDON_CONFIGS_DIR}/" "${SNAPSHOT_DIR}/addon_configs/"
+  rsync -a --delete "${ALL_APP_CONFIGS_DIR}/" "${SNAPSHOT_DIR}/addon_configs/"
   GIT_INDEX_FILE="${INDEX_FILE}" \
   GIT_CONFIG_COUNT=1 \
   GIT_CONFIG_KEY_0=core.excludesfile \
   GIT_CONFIG_VALUE_0="${GITIGNORE_FILE}" \
   git --git-dir="${GIT_METADATA_DIR}" --work-tree="${SNAPSHOT_DIR}" add -A -- addon_configs
-  debug_log "all add-on configurations: staged $(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" diff --cached --name-only -- addon_configs | wc -l | tr -d ' ') path(s)"
+  debug_log "all app configurations: staged $(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" diff --cached --name-only -- addon_configs | wc -l | tr -d ' ') path(s)"
 }
 
 
@@ -207,10 +207,10 @@ log_mount_diagnostics() {
       debug_log "container directory ${path}: missing"
     fi
   done
-  if [[ -d "${ADDON_CONFIG_DIR}" ]]; then
-    debug_log "addon_config mount is available at ${ADDON_CONFIG_DIR}; active ignore file=${GITIGNORE_FILE}"
+  if [[ -d "${APP_CONFIG_DIR}" ]]; then
+    debug_log "app_config mount is available at ${APP_CONFIG_DIR}; active ignore file=${GITIGNORE_FILE}"
   else
-    debug_log "addon_config mount is unavailable at ${ADDON_CONFIG_DIR}"
+    debug_log "app_config mount is unavailable at ${APP_CONFIG_DIR}"
   fi
 
   debug_log "options file: ${OPTIONS_FILE}"
@@ -221,7 +221,7 @@ log_mount_diagnostics() {
     debug_log "configured branch: ${branch}"
     debug_log "configured git_name: ${git_name}"
     debug_log "configured git_email: ${git_email}"
-    debug_log "include_all_addon_configs: ${include_all_addon_configs}"
+    debug_log "include_all_app_configs: ${include_all_app_configs}"
     debug_log 'github_token: [configured; value not logged]'
   else
     debug_log 'options file is not readable'
@@ -240,10 +240,10 @@ log_mount_diagnostics() {
   else
     debug_log 'mountinfo: /proc/self/mountinfo is not readable'
   fi
-  if discover_all_addon_configs_mount; then
-    debug_log "all_addon_configs discovery result: ${ALL_ADDON_CONFIGS_DIR}"
+  if discover_all_app_configs_mount; then
+    debug_log "all_app_configs discovery result: ${ALL_APP_CONFIGS_DIR}"
   else
-    debug_log 'all_addon_configs discovery result: no mount found'
+    debug_log 'all_app_configs discovery result: no mount found'
   fi
   debug_log '=== End startup mount diagnostics ==='
 }
@@ -341,7 +341,7 @@ rebuild_index_from_config() {
   rm -f "${INDEX_FILE}"
   safe_git read-tree --empty
   safe_git add -A -- .
-  add_all_addon_configs_to_index
+  add_all_app_configs_to_index
   bashio::log.info "Staged $(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" diff --cached --name-only | wc -l | tr -d ' ') path(s) after applying ignore rules."
 
   # Preserve a copy of the rules in the private repository under a neutral name.

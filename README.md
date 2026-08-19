@@ -7,7 +7,7 @@ This is a **public Home Assistant add-on repository**. The add-on backs up Home 
 - **Home Assistant configuration source:** `/homeassistant`
 - **Git metadata and diagnostics:** `/data`
 - **Web UI:** status, active rule preview, logs, cache reset, and repository link
-- **Optional all add-on configurations:** `/addons` when explicitly enabled
+- **Optional all app configurations:** dynamically discovered when explicitly enabled
 
 The add-on treats `/homeassistant` as a read-only source tree. It does not run Git cleanup, checkout, restore, or reset operations against Home Assistant configuration files.
 
@@ -39,9 +39,9 @@ The add-on builds an isolated Git index from the mounted Home Assistant configur
 
 By default, external add-on configuration folders are not included.
 
-### Optional: include all add-on configurations
+### Optional: include all app configurations
 
-Set `include_all_addon_configs: true` only when you deliberately want to back up every Supervisor-managed add-on configuration folder. The add-on uses Home Assistant’s official `all_addon_configs:rw` map and stores these files under:
+Set `include_all_app_configs: true` only when you deliberately want to back up every Supervisor-managed app configuration folder. The add-on uses Home Assistant’s official `all_app_configs:rw` map and stores these files under:
 
 ```text
 addon_configs/
@@ -49,11 +49,7 @@ addon_configs/
 
 in the private backup repository.
 
-> **Security warning:** This may include settings and credentials for other add-ons. Keep the destination repository private and review the active Git ignore rules before enabling this option.
-
-> **Mount diagnostic note:** Version 4.1.1 requests the Supervisor-managed `addon_config` mount and logs whether it is available at `/config`. During this diagnostic step, the active Git ignore file remains `/data/gitignore` so a missing mount cannot stop synchronization.
-
-> **Internal diagnostic note:** Version 4.2.0 enables `addon_config:rw` to inspect whether the Supervisor provides `/config` in this environment. The active ignore file remains `/data/gitignore` during this step, so synchronization continues even if `/config` is unavailable.
+> **Security warning:** This may include settings and credentials for other apps. Keep the destination repository private and review the active Git ignore rules before enabling this option.
 
 ## Git ignore rules
 
