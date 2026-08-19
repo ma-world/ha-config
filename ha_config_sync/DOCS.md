@@ -61,7 +61,7 @@ The Web UI displays the active Git ignore rules used for synchronization. To cha
 
 The add-on never overwrites an existing rule file during startup or update.
 
-The default rules exclude runtime data, logs, credentials, selected large media files, community frontend assets, ESPHome build artifacts, and common Zigbee2MQTT database/log files.
+The default rules exclude runtime data, logs, credentials, selected large media and compressed web assets, community frontend assets, ESPHome build artifacts, and common Zigbee2MQTT database/log files.
 
 > **Security note:** Keep `secrets.yaml` ignored unless you fully understand the implications and use a private repository. Git ignore rules do not remove files already committed in Git history.
 

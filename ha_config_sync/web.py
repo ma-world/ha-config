@@ -33,6 +33,7 @@ secrets.yaml
 www/**/*.mp4
 www/**/*.zip
 www/**/*.tar
+www/**/*.gz
 www/community/
 esphome/.esphome/
 zigbee2mqtt/database.db*

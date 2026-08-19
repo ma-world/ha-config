@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.6.1
+
+- Added `www/**/*.gz` to the default Git ignore rules for compressed web assets.
+
 ## 4.6.0
 
 - Updated deprecated Supervisor map names to `app_config:rw` and `all_app_configs:rw`.
