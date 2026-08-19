@@ -12,7 +12,7 @@ readonly ADDON_CONFIG_DIR=/config
 readonly GITIGNORE_FILE="${ADDON_CONFIG_DIR}/gitignore"
 readonly LEGACY_GITIGNORE_FILE=/data/gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
-readonly ALL_ADDON_CONFIGS_DIR=
+ALL_ADDON_CONFIGS_DIR=
 
 repository_url="$(bashio::config 'repository_url')"
 branch="$(bashio::config 'branch')"

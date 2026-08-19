@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.5.2
+
+- Fixed dynamic all-add-on-config mount discovery by making its discovered container path mutable instead of read-only.
+
 ## 4.5.1
 
 - Dynamically discovers the `all_addon_configs` container mount from `/proc/self/mountinfo` instead of assuming a fixed path.
