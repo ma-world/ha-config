@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.5.1
+
+- Dynamically discovers the `all_addon_configs` container mount from `/proc/self/mountinfo` instead of assuming a fixed path.
+- Added a Web UI button to clear the persistent sync debug log.
+
 ## 4.5.0
 
 - Added optional `include_all_addon_configs` support using the official `all_addon_configs:rw` Supervisor map.

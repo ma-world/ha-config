@@ -12,7 +12,7 @@ readonly ADDON_CONFIG_DIR=/config
 readonly GITIGNORE_FILE="${ADDON_CONFIG_DIR}/gitignore"
 readonly LEGACY_GITIGNORE_FILE=/data/gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
-readonly ALL_ADDON_CONFIGS_DIR=/addons
+readonly ALL_ADDON_CONFIGS_DIR=
 
 repository_url="$(bashio::config 'repository_url')"
 branch="$(bashio::config 'branch')"
@@ -124,14 +124,37 @@ safe_git() {
   git --git-dir="${GIT_METADATA_DIR}" --work-tree="${CONFIG_DIR}" "$@"
 }
 
+discover_all_addon_configs_mount() {
+  local mount_line source_root
+  ALL_ADDON_CONFIGS_DIR=''
+  if [[ ! -r /proc/self/mountinfo ]]; then
+    debug_log 'all_addon_configs mount discovery: /proc/self/mountinfo is not readable'
+    return 1
+  fi
+
+  while IFS= read -r mount_line; do
+    source_root="$(printf '%s' "${mount_line}" | awk -F' - ' '{print $1}' | awk '{print $4}')"
+    case "${source_root}" in
+      /supervisor/app_configs)
+        ALL_ADDON_CONFIGS_DIR="$(printf '%s' "${mount_line}" | awk -F' - ' '{print $1}' | awk '{print $5}')"
+        debug_log "all_addon_configs mount discovery: source=${source_root}; container_target=${ALL_ADDON_CONFIGS_DIR}"
+        return 0
+        ;;
+    esac
+  done < /proc/self/mountinfo
+
+  debug_log 'all_addon_configs mount discovery: no /supervisor/app_configs root mount found'
+  return 1
+}
+
 add_all_addon_configs_to_index() {
   if [[ "${include_all_addon_configs}" != 'true' ]]; then
     debug_log 'all add-on configurations: disabled'
     return 0
   fi
-  if [[ ! -d "${ALL_ADDON_CONFIGS_DIR}" ]]; then
-    bashio::log.warning "All add-on configurations are enabled, but ${ALL_ADDON_CONFIGS_DIR} is not mounted. Skipping them."
-    debug_log "all add-on configurations: enabled but mount missing at ${ALL_ADDON_CONFIGS_DIR}"
+  if ! discover_all_addon_configs_mount || [[ -z "${ALL_ADDON_CONFIGS_DIR}" || ! -d "${ALL_ADDON_CONFIGS_DIR}" ]]; then
+    bashio::log.warning 'All add-on configurations are enabled, but the Supervisor all_addon_configs mount could not be found. Skipping them.'
+    debug_log 'all add-on configurations: enabled but no usable mount was discovered'
     return 0
   fi
 
@@ -216,6 +239,11 @@ log_mount_diagnostics() {
     fi
   else
     debug_log 'mountinfo: /proc/self/mountinfo is not readable'
+  fi
+  if discover_all_addon_configs_mount; then
+    debug_log "all_addon_configs discovery result: ${ALL_ADDON_CONFIGS_DIR}"
+  else
+    debug_log 'all_addon_configs discovery result: no mount found'
   fi
   debug_log '=== End startup mount diagnostics ==='
 }

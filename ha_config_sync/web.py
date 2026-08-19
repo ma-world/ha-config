@@ -108,6 +108,9 @@ PAGE = """<!doctype html>
     <div class="log-links">
       <a class="log-link" href="./sync-log">View sync debug log</a>
       <a class="log-link" href="./sync-log?download=1">Download sync debug log</a>
+      <form method="post" action="clear-sync-log" onsubmit="return confirm('Clear the sync debug log?');">
+        <button class="danger-button" type="submit">Clear sync debug log</button>
+      </form>
     </div>
     <h3>Startup mount diagnostics and latest sync debug log</h3>
     <pre>{sync_log_preview}</pre>
@@ -332,6 +335,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if "cache-cleared=1" in query:
             message = '<p class="notice">Local Git cache cleared. The next sync will download the repository again.</p>'
+        elif "sync-log-cleared=1" in query:
+            message = '<p class="notice">Sync debug log cleared.</p>'
+        elif "sync-log-clear-error=1" in query:
+            message = '<p class="error">Could not clear the sync debug log.</p>'
         else:
             message = ""
         status = read_status()
@@ -355,6 +362,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path.rstrip("/")
+        if path == "/clear-sync-log":
+            try:
+                SYNC_DEBUG_LOG.write_text("", encoding="utf-8")
+                SYNC_DEBUG_LOG.chmod(0o600)
+                debug_log("sync debug log cleared from Web UI")
+            except OSError as error:
+                self.send_response(HTTPStatus.SEE_OTHER)
+                self.send_header("Location", "./?sync-log-clear-error=1")
+                self.end_headers()
+                return
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Location", "./?sync-log-cleared=1")
+            self.end_headers()
+            return
         if path == "/clear-cache":
             debug_log("local Git cache clear requested")
             try:
