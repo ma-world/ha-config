@@ -90,6 +90,7 @@ PAGE = """<!doctype html>
   {backup_repository_link}
   <p>Home Assistant configuration source: <code>/homeassistant</code>. Git metadata and diagnostics: <code>/data</code>.</p>
   {secrets_warning}
+  {all_addon_configs_warning}
   <p><strong>Security:</strong> Keep <code>secrets.yaml</code> ignored unless you deliberately want to store secrets in a private repository.</p>
   <section class="logs">
     <h2>Active Git ignore rules</h2>
@@ -266,6 +267,20 @@ def include_secrets_enabled() -> bool:
         return False
 
 
+def include_all_addon_configs_enabled() -> bool:
+    try:
+        return json.loads(OPTIONS_FILE.read_text(encoding="utf-8")).get("include_all_addon_configs") is True
+    except (FileNotFoundError, ValueError):
+        return False
+
+
+def all_addon_configs_warning() -> str:
+    if include_all_addon_configs_enabled():
+        return ("<p class='warning'><strong>All add-on configurations are included.</strong> "
+                "The backup contains configuration data for other add-ons. Keep the destination repository private and review the active Git ignore rules.</p>")
+    return ""
+
+
 def secrets_warning(rules: str) -> str:
     secrets_ignored = any(
         line.strip().lstrip("/") == "secrets.yaml"
@@ -323,6 +338,7 @@ class Handler(BaseHTTPRequestHandler):
         rules, rules_error = read_rules()
         page = (PAGE.replace("{notice}", message + rules_error)
                      .replace("{secrets_warning}", secrets_warning(rules))
+                     .replace("{all_addon_configs_warning}", all_addon_configs_warning())
                      .replace("{backup_repository_link}", backup_repository_link())
                      .replace("{rules}", html_escape(rules))
                      .replace("{host_gitignore_path}", html_escape(host_gitignore_path()))

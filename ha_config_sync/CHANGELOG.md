@@ -2,6 +2,12 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.5.0
+
+- Added optional `include_all_addon_configs` support using the official `all_addon_configs:rw` Supervisor map.
+- When enabled, all add-on configuration folders are backed up under `addon_configs/` in the private Git repository.
+- Added default ignore rules and clear safety warnings for common sensitive and runtime files in add-on configurations.
+
 ## 4.4.0
 
 - Empty private backup repositories are now initialized with an English README linking to the HA Config Sync project before the first configuration commit.

@@ -12,6 +12,7 @@ readonly ADDON_CONFIG_DIR=/config
 readonly GITIGNORE_FILE="${ADDON_CONFIG_DIR}/gitignore"
 readonly LEGACY_GITIGNORE_FILE=/data/gitignore
 readonly SNAPSHOT_DIR=/data/snapshots
+readonly ALL_ADDON_CONFIGS_DIR=/addons
 
 repository_url="$(bashio::config 'repository_url')"
 branch="$(bashio::config 'branch')"
@@ -19,6 +20,7 @@ git_name="$(bashio::config 'git_name')"
 git_email="$(bashio::config 'git_email')"
 github_token="$(bashio::config 'github_token')"
 sync_interval_hours="$(bashio::config 'sync_interval_hours')"
+include_all_addon_configs="$(bashio::config 'include_all_addon_configs')"
 
 if [[ -z "${repository_url}" ]]; then
   bashio::log.fatal 'repository_url must be configured.'
@@ -55,6 +57,15 @@ www/community/
 esphome/.esphome/
 zigbee2mqtt/database.db*
 zigbee2mqtt/logs/
+
+# When all add-on configurations are included, exclude common sensitive/runtime data
+addon_configs/**/secrets.yaml
+addon_configs/**/home-assistant_v2.db*
+addon_configs/**/*.db*
+addon_configs/**/*.log
+addon_configs/**/.storage/*
+addon_configs/**/auth*
+addon_configs/**/tokens*
 GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 }
@@ -113,6 +124,31 @@ safe_git() {
   git --git-dir="${GIT_METADATA_DIR}" --work-tree="${CONFIG_DIR}" "$@"
 }
 
+add_all_addon_configs_to_index() {
+  if [[ "${include_all_addon_configs}" != 'true' ]]; then
+    debug_log 'all add-on configurations: disabled'
+    return 0
+  fi
+  if [[ ! -d "${ALL_ADDON_CONFIGS_DIR}" ]]; then
+    bashio::log.warning "All add-on configurations are enabled, but ${ALL_ADDON_CONFIGS_DIR} is not mounted. Skipping them."
+    debug_log "all add-on configurations: enabled but mount missing at ${ALL_ADDON_CONFIGS_DIR}"
+    return 0
+  fi
+
+  bashio::log.warning 'All add-on configurations are enabled. Ensure the destination repository remains private.'
+  debug_log "all add-on configurations: creating isolated snapshot from ${ALL_ADDON_CONFIGS_DIR}"
+  rm -rf "${SNAPSHOT_DIR}/addon_configs"
+  mkdir -p "${SNAPSHOT_DIR}/addon_configs"
+  rsync -a --delete "${ALL_ADDON_CONFIGS_DIR}/" "${SNAPSHOT_DIR}/addon_configs/"
+  GIT_INDEX_FILE="${INDEX_FILE}" \
+  GIT_CONFIG_COUNT=1 \
+  GIT_CONFIG_KEY_0=core.excludesfile \
+  GIT_CONFIG_VALUE_0="${GITIGNORE_FILE}" \
+  git --git-dir="${GIT_METADATA_DIR}" --work-tree="${SNAPSHOT_DIR}" add -A -- addon_configs
+  debug_log "all add-on configurations: staged $(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" diff --cached --name-only -- addon_configs | wc -l | tr -d ' ') path(s)"
+}
+
+
 debug_log() {
   local message="$1"
   local timestamp
@@ -140,7 +176,7 @@ mask_value() {
 log_mount_diagnostics() {
   local path option_slug mount_lines
   debug_log '=== Startup mount diagnostics ==='
-  for path in /homeassistant /config /data; do
+  for path in /homeassistant /config /data /addons; do
     if [[ -d "${path}" ]]; then
       debug_log "container directory ${path}: present ($(ls -ld "${path}" 2>/dev/null || true))"
       debug_log "container directory ${path}: entries=$(ls -A "${path}" 2>/dev/null | tr '\n' ',' | sed 's/,$//' || true)"
@@ -162,6 +198,7 @@ log_mount_diagnostics() {
     debug_log "configured branch: ${branch}"
     debug_log "configured git_name: ${git_name}"
     debug_log "configured git_email: ${git_email}"
+    debug_log "include_all_addon_configs: ${include_all_addon_configs}"
     debug_log 'github_token: [configured; value not logged]'
   else
     debug_log 'options file is not readable'
@@ -169,13 +206,13 @@ log_mount_diagnostics() {
 
   debug_log 'relevant /proc/self/mountinfo entries:'
   if [[ -r /proc/self/mountinfo ]]; then
-    mount_lines="$(grep -E ' /homeassistant | /config | /data ' /proc/self/mountinfo || true)"
+    mount_lines="$(grep -E ' /homeassistant | /config | /data | /addons ' /proc/self/mountinfo || true)"
     if [[ -n "${mount_lines}" ]]; then
       while IFS= read -r mount_line; do
         debug_log "mountinfo: ${mount_line}"
       done <<< "${mount_lines}"
     else
-      debug_log 'mountinfo: no entries matched /homeassistant, /config, or /data'
+      debug_log 'mountinfo: no entries matched /homeassistant, /config, /data, or /addons'
     fi
   else
     debug_log 'mountinfo: /proc/self/mountinfo is not readable'
@@ -276,6 +313,7 @@ rebuild_index_from_config() {
   rm -f "${INDEX_FILE}"
   safe_git read-tree --empty
   safe_git add -A -- .
+  add_all_addon_configs_to_index
   bashio::log.info "Staged $(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" diff --cached --name-only | wc -l | tr -d ' ') path(s) after applying ignore rules."
 
   # Preserve a copy of the rules in the private repository under a neutral name.

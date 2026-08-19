@@ -7,6 +7,7 @@ This is a **public Home Assistant add-on repository**. The add-on backs up Home 
 - **Home Assistant configuration source:** `/homeassistant`
 - **Git metadata and diagnostics:** `/data`
 - **Web UI:** status, active rule preview, logs, cache reset, and repository link
+- **Optional all add-on configurations:** `/addons` when explicitly enabled
 
 The add-on treats `/homeassistant` as a read-only source tree. It does not run Git cleanup, checkout, restore, or reset operations against Home Assistant configuration files.
 
@@ -36,7 +37,19 @@ If the selected private repository is empty, the add-on initializes its configur
 
 The add-on builds an isolated Git index from the mounted Home Assistant configuration source at `/homeassistant` and pushes changes to the configured branch.
 
-External add-on data outside `/homeassistant` is not included.
+By default, external add-on configuration folders are not included.
+
+### Optional: include all add-on configurations
+
+Set `include_all_addon_configs: true` only when you deliberately want to back up every Supervisor-managed add-on configuration folder. The add-on uses Home Assistant’s official `all_addon_configs:rw` map and stores these files under:
+
+```text
+addon_configs/
+```
+
+in the private backup repository.
+
+> **Security warning:** This may include settings and credentials for other add-ons. Keep the destination repository private and review the active Git ignore rules before enabling this option.
 
 > **Mount diagnostic note:** Version 4.1.1 requests the Supervisor-managed `addon_config` mount and logs whether it is available at `/config`. During this diagnostic step, the active Git ignore file remains `/data/gitignore` so a missing mount cannot stop synchronization.
 
