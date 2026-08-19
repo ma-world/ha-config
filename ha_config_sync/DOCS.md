@@ -30,7 +30,7 @@ The add-on treats `/homeassistant` as a read-only source tree. It does not run G
 
 7. Start the add-on. It syncs immediately and then repeats at the configured interval.
 
-If the selected private repository is empty, the add-on initializes its configured branch before the first configuration sync.
+If the selected private repository is empty, the add-on initializes its configured branch with an English README linking to HA Config Sync before the first configuration sync.
 
 ## What is backed up
 

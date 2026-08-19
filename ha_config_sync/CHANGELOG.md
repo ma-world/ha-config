@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.4.0
+
+- Empty private backup repositories are now initialized with an English README linking to the HA Config Sync project before the first configuration commit.
+
 ## 4.3.1
 
 - Made the host-visible Git ignore path portable by deriving the add-on slug from the Supervisor `/config` mount metadata at runtime.

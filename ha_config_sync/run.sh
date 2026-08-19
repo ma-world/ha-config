@@ -244,15 +244,28 @@ verify_private_repository() {
 
 initialize_empty_remote_repository() {
   bashio::log.info "Remote branch '${branch}' does not exist yet; initializing the private backup repository."
-  local empty_tree commit
-  empty_tree="$(git --git-dir="${GIT_METADATA_DIR}" mktree </dev/null)"
+  local readme_file empty_tree commit
+  readme_file="${SNAPSHOT_DIR}/README.md"
+  mkdir -p "${SNAPSHOT_DIR}"
+  cat >"${readme_file}" <<'README'
+# Home Assistant Configuration Backup
+
+This private repository stores Home Assistant configuration backups created by [HA Config Sync](https://github.com/ma-world/ha-config).
+README
+
+  rm -f "${INDEX_FILE}"
+  GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" --work-tree="${SNAPSHOT_DIR}" read-tree --empty
+  GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" --work-tree="${SNAPSHOT_DIR}" add README.md
+  empty_tree="$(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" write-tree)"
   commit="$(git --git-dir="${GIT_METADATA_DIR}" commit-tree "${empty_tree}" -m 'Initialize Home Assistant configuration backup repository')"
   git --git-dir="${GIT_METADATA_DIR}" update-ref "refs/heads/${branch}" "${commit}"
   if ! git --git-dir="${GIT_METADATA_DIR}" push --set-upstream origin "refs/heads/${branch}:refs/heads/${branch}"; then
-    bashio::log.fatal 'Could not push the initial commit to the backup repository.'
+    bashio::log.fatal 'Could not push the initial README commit to the backup repository.'
     return 1
   fi
+  rm -f "${readme_file}" "${INDEX_FILE}"
   git --git-dir="${GIT_METADATA_DIR}" fetch --prune origin
+  debug_log "initialized empty backup repository with README commit=${commit}"
 }
 
 
