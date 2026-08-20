@@ -69,6 +69,10 @@ The default rules exclude runtime data, logs, credentials, selected large media 
 
 > **Security note:** Keep `secrets.yaml` ignored unless you fully understand the implications and use a private repository. Git ignore rules do not remove files already committed in Git history.
 
+### Updating existing Git ignore files
+
+On startup, the add-on safely appends missing ESPHome and app-configuration safety rules to an existing Git ignore file. Existing user-defined rules are retained and no existing line is changed or removed.
+
 ## Web UI and diagnostics
 
 Open **HA Config Sync → Open Web UI** for:

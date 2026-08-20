@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.9.1
+
+- Existing Git ignore files are now upgraded safely by appending missing ESPHome and app-configuration protection rules without changing user-defined rules.
+
 ## 4.9.0
 
 - Backs up ESPHome configurations as regular files instead of an embedded Git repository link.

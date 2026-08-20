@@ -77,6 +77,48 @@ GITIGNORE
   chmod 600 "${GITIGNORE_FILE}"
 }
 
+ensure_default_ignore_rules() {
+  local rule
+  local required_rules=(
+    'esphome/.git/'
+    'esphome/.esphome/'
+    'esphome/.device-builder-peer-link-key.bin'
+    'esphome/.device-builder-preferences.json'
+    'esphome/.device-builder.json'
+    'esphome/.device-builder.json.lock'
+    'esphome/secrets.yaml'
+    'addon_configs/**/secrets.yaml'
+    'addon_configs/**/home-assistant_v2.db*'
+    'addon_configs/**/*.db*'
+    'addon_configs/**/*.log'
+    'addon_configs/**/.storage/*'
+    'addon_configs/**/auth*'
+    'addon_configs/**/tokens*'
+  )
+
+  local added=0
+  for rule in "${required_rules[@]}"; do
+    if ! grep -Fxq -- "${rule}" "${GITIGNORE_FILE}"; then
+      if (( added == 0 )); then
+        printf '
+# Added by HA Config Sync update: ESPHome and app configuration safety rules
+' >> "${GITIGNORE_FILE}"
+      fi
+      printf '%s
+' "${rule}" >> "${GITIGNORE_FILE}"
+      debug_log "Git ignore update: appended missing rule ${rule}"
+      added=1
+    fi
+  done
+
+  if (( added == 1 )); then
+    chmod 600 "${GITIGNORE_FILE}"
+    bashio::log.info 'Added missing safe ESPHome and app configuration Git ignore rules to the existing file.'
+  else
+    debug_log 'Git ignore update: all managed ESPHome and app configuration rules already present'
+  fi
+}
+
 # The user-managed ignore file is stored in the Supervisor-managed add-on
 # configuration folder. It is shared with the host-visible path documented in
 # the Web UI and is never overwritten when it already exists.
@@ -95,9 +137,10 @@ elif [[ ! -f "${GITIGNORE_FILE}" ]]; then
   bashio::log.fatal "Git ignore path exists but is not a regular file: ${GITIGNORE_FILE}."
   exit 1
 else
-  bashio::log.info "Using existing Git ignore file without modification: ${GITIGNORE_FILE} ($(wc -c < "${GITIGNORE_FILE}") bytes)."
+  bashio::log.info "Using existing Git ignore file: ${GITIGNORE_FILE} ($(wc -c < "${GITIGNORE_FILE}") bytes)."
 fi
 
+ensure_default_ignore_rules
 
 askpass_file=''
 web_pid=''
