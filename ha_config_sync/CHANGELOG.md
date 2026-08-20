@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 5.0.0
+
+- Removed the `include_secrets` app option. Secrets inclusion is now controlled solely and explicitly through the user-managed Git ignore file.
+
 ## 4.9.2
 
 - Fixed startup failure when upgrading existing Git ignore files by using the standard add-on logger before the debug logger is initialized.

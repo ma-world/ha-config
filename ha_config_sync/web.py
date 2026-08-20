@@ -270,13 +270,6 @@ def format_timestamp(value: str | None, fallback: str) -> str:
         return value
 
 
-def include_secrets_enabled() -> bool:
-    try:
-                return json.loads(OPTIONS_FILE.read_text(encoding="utf-8")).get("include_secrets") is True
-    except (FileNotFoundError, ValueError):
-        return False
-
-
 def include_all_app_configs_enabled() -> bool:
     try:
         return json.loads(OPTIONS_FILE.read_text(encoding="utf-8")).get("include_all_app_configs") is True
@@ -297,19 +290,11 @@ def secrets_warning(rules: str) -> str:
         for line in rules.splitlines()
         if not line.strip().startswith("#")
     )
-    if not secrets_ignored and not include_secrets_enabled():
-        return ("<p class='warning'><strong>Secrets are still protected.</strong> "
-                "The ignore rule for <code>secrets.yaml</code> was removed, "
-                "but <strong>Include secrets</strong> is disabled in the add-on configuration. "
-                "The file will not be copied or committed until you explicitly enable that option.</p>")
-    if include_secrets_enabled() and secrets_ignored:
-        return ("<p class='warning'><strong>Secrets will not be committed.</strong> "
-                "<strong>Include secrets</strong> is enabled, but "
-                "<code>secrets.yaml</code> is still ignored by these rules.</p>")
-    if include_secrets_enabled() and not secrets_ignored:
-        return ("<p class='warning'><strong>Secrets backup is enabled.</strong> "
-                "<code>secrets.yaml</code> can be committed to your private backup repository.</p>")
-    return ""
+    if secrets_ignored:
+        return ("<p class='warning'><strong>Secrets protection is active.</strong> "
+                "The Git ignore rules exclude <code>secrets.yaml</code>. To include secrets, explicitly edit the Git ignore file in File Editor or Studio Code Server and remove the relevant rules.</p>")
+    return ("<p class='warning'><strong>Secrets may be included.</strong> "
+            "The Git ignore rules do not exclude <code>secrets.yaml</code>. Keep the destination repository private and review the active rules carefully.</p>")
 
 
 def read_status() -> dict[str, str]:
