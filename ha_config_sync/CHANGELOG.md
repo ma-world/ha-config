@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.9.2
+
+- Fixed startup failure when upgrading existing Git ignore files by using the standard add-on logger before the debug logger is initialized.
+
 ## 4.9.1
 
 - Existing Git ignore files are now upgraded safely by appending missing ESPHome and app-configuration protection rules without changing user-defined rules.

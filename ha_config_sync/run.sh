@@ -106,7 +106,7 @@ ensure_default_ignore_rules() {
       fi
       printf '%s
 ' "${rule}" >> "${GITIGNORE_FILE}"
-      debug_log "Git ignore update: appended missing rule ${rule}"
+      bashio::log.info "Git ignore update: appended missing rule ${rule}"
       added=1
     fi
   done
@@ -115,7 +115,7 @@ ensure_default_ignore_rules() {
     chmod 600 "${GITIGNORE_FILE}"
     bashio::log.info 'Added missing safe ESPHome and app configuration Git ignore rules to the existing file.'
   else
-    debug_log 'Git ignore update: all managed ESPHome and app configuration rules already present'
+    bashio::log.info 'Git ignore update: all managed ESPHome and app configuration rules already present'
   fi
 }
 
