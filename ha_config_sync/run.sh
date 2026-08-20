@@ -353,6 +353,48 @@ rebuild_index_from_config() {
   rm -f "${SNAPSHOT_DIR}/ha_config_sync.gitignore.backup"
 }
 
+log_pre_push_analysis() {
+  local analysis_file staged_count total_size path_size
+  analysis_file="$(mktemp)"
+
+  GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" ls-files -s >"${analysis_file}"
+  staged_count="$(wc -l < "${analysis_file}" | tr -d ' ')"
+  total_size="$(awk '{print $4}' "${analysis_file}" | while IFS= read -r indexed_path; do
+    git --git-dir="${GIT_METADATA_DIR}" cat-file -s ":${indexed_path}" 2>/dev/null || true
+  done | awk '{sum += $1} END {print sum + 0}')"
+
+  debug_log '=== Pre-push staged content analysis ==='
+  debug_log "local commit: ${new_commit}"
+  debug_log "parent commit: ${parent_commit}"
+  debug_log "staged paths: ${staged_count}"
+  debug_log "staged content bytes: ${total_size}"
+  debug_log 'largest staged paths (top 20 by Git blob size):'
+
+  while IFS=$'\t' read -r path_size indexed_path; do
+    debug_log "staged path: ${path_size} bytes | ${indexed_path}"
+  done < <(
+    awk '{print $4}' "${analysis_file}" | while IFS= read -r indexed_path; do
+      path_size="$(git --git-dir="${GIT_METADATA_DIR}" cat-file -s ":${indexed_path}" 2>/dev/null || printf '0')"
+      printf '%s\t%s\n' "${path_size}" "${indexed_path}"
+    done | sort -rn -k1,1 | head -20
+  )
+
+  debug_log 'critical ignore checks:'
+  local critical_path
+  for critical_path in     home-assistant_v2.db     home-assistant_v2.db-wal     frigate.db     deps     model_cache     www/community     zigbee2mqtt/log     zigbee2mqtt/database.db     esphome/.git; do
+    if GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" ls-files --error-unmatch -- "${critical_path}" >/dev/null 2>&1; then
+      debug_log "critical path indexed: ${critical_path}"
+    elif GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.excludesfile GIT_CONFIG_VALUE_0="${GITIGNORE_FILE}" git --git-dir="${GIT_METADATA_DIR}" --work-tree="${CONFIG_DIR}" check-ignore -q -- "${critical_path}" 2>/dev/null; then
+      debug_log "critical path ignored: ${critical_path}"
+    else
+      debug_log "critical path not indexed: ${critical_path}"
+    fi
+  done
+
+  rm -f "${analysis_file}"
+  debug_log '=== End pre-push staged content analysis ==='
+}
+
 sync_configuration() {
   debug_log "sync started; repository=${repository_url}; branch=${branch}; active_ignore_file=${GITIGNORE_FILE}"
   write_status last_check
@@ -408,6 +450,8 @@ sync_configuration() {
   commit_message="Home Assistant configuration sync $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
   new_commit="$(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" commit-tree "${new_tree}" -p "${parent_commit}" -m "${commit_message}")"
   git --git-dir="${GIT_METADATA_DIR}" update-ref "refs/heads/${branch}" "${new_commit}" "${parent_commit}"
+
+  log_pre_push_analysis
 
   local push_output push_status
   push_output="$(mktemp)"

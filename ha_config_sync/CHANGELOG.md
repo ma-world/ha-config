@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.7.0
+
+- Added pre-push staged-content analysis to the sync debug log: staged path count, total content size, largest 20 paths, and critical ignore checks.
+
 ## 4.6.2
 
 - Captures complete Git push output and exit status in the persistent sync debug log when a push fails.
