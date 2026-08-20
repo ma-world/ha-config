@@ -431,6 +431,8 @@ sync_configuration() {
 
   git --git-dir="${GIT_METADATA_DIR}" config user.name "${git_name}"
   git --git-dir="${GIT_METADATA_DIR}" config user.email "${git_email}"
+  git --git-dir="${GIT_METADATA_DIR}" config http.version HTTP/1.1
+  debug_log 'Git transport configured: HTTP/1.1'
 
   # Fetch all remote references. Fetching a specific branch fails with
   # "couldn't find remote ref" when a newly created private repository has no

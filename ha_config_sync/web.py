@@ -379,6 +379,21 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/clear-cache":
             debug_log("local Git cache clear requested")
+            if (GIT_METADATA_DIR / "HEAD").is_file():
+                try:
+                    completed = subprocess.run(
+                        ["git", f"--git-dir={GIT_METADATA_DIR}", "gc", "--prune=now"],
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        timeout=60,
+                        check=False,
+                    )
+                    debug_log(f"local Git garbage collection exit={completed.returncode}")
+                    for line in completed.stdout.splitlines():
+                        debug_log(f"git gc output: {line}")
+                except (OSError, subprocess.TimeoutExpired) as error:
+                    debug_log(f"local Git garbage collection failed: {error}")
             try:
                 import shutil
                 shutil.rmtree(GIT_METADATA_DIR)

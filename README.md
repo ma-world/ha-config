@@ -77,7 +77,7 @@ Open **HA Config Sync → Open Web UI** for:
 
 **Clear sync debug log** clears the persistent sync diagnostic log.
 
-**Clear local Git cache** removes only the add-on’s local Git metadata, index, and transient snapshots from `/data`. It does not change `/homeassistant` or the remote GitHub repository. Locally created commits that have not been pushed are discarded.
+**Clear local Git cache** first runs Git garbage collection in the isolated local Git metadata store, then removes the add-on’s local Git metadata, index, and transient snapshots from `/data`. It does not change `/homeassistant` or the remote GitHub repository. Locally created commits that have not been pushed are discarded.
 
 ## Changelog
 

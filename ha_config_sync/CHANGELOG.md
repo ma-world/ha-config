@@ -2,6 +2,11 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.8.0
+
+- Configured Git HTTPS pushes to use HTTP/1.1 for improved reliability with Home Assistant network environments.
+- The Clear local Git cache action now runs Git garbage collection in the isolated metadata store before deleting local cache data.
+
 ## 4.7.1
 
 - Fixed pre-push staged-content size analysis to calculate Git blob sizes from object IDs in the isolated index.
