@@ -72,7 +72,7 @@ Open **HA Config Sync → Open Web UI** for:
 - last sync check and last commit time,
 - active Git ignore rule preview,
 - link to the private backup repository,
-- sync log preview and download,
+- sync log preview and download (including full Git push errors when a push fails),
 - **Clear local Git cache**.
 
 **Clear sync debug log** clears the persistent sync diagnostic log.

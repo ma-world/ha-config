@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.6.2
+
+- Captures complete Git push output and exit status in the persistent sync debug log when a push fails.
+
 ## 4.6.1
 
 - Added `www/**/*.gz` to the default Git ignore rules for compressed web assets.

@@ -409,9 +409,18 @@ sync_configuration() {
   new_commit="$(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" commit-tree "${new_tree}" -p "${parent_commit}" -m "${commit_message}")"
   git --git-dir="${GIT_METADATA_DIR}" update-ref "refs/heads/${branch}" "${new_commit}" "${parent_commit}"
 
-  if ! git --git-dir="${GIT_METADATA_DIR}" push origin "refs/heads/${branch}:refs/heads/${branch}"; then
-    debug_log "sync push failed; local_commit=${new_commit}"
-    bashio::log.error 'Configuration commit was created locally, but the push failed. The next scheduled sync will retry.'
+  local push_output push_status
+  push_output="$(mktemp)"
+  if git --git-dir="${GIT_METADATA_DIR}" push origin "refs/heads/${branch}:refs/heads/${branch}" >"${push_output}" 2>&1; then
+    rm -f "${push_output}"
+  else
+    push_status=$?
+    debug_log "sync push failed; local_commit=${new_commit}; exit_status=${push_status}"
+    while IFS= read -r push_line || [[ -n "${push_line}" ]]; do
+      debug_log "push output: ${push_line}"
+    done < "${push_output}"
+    rm -f "${push_output}"
+    bashio::log.error 'Configuration commit was created locally, but the push failed. Full Git push output is available in the sync debug log.'
     return 1
   fi
 
