@@ -354,13 +354,15 @@ rebuild_index_from_config() {
 }
 
 log_pre_push_analysis() {
-  local analysis_file staged_count total_size path_size
+  local analysis_file staged_count total_size path_size object_id indexed_path mode stage
   analysis_file="$(mktemp)"
 
+  # `ls-files -s` emits: mode object-id stage<TAB>path.  Use the object id
+  # directly; :path lookups do not see this isolated temporary index.
   GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" ls-files -s >"${analysis_file}"
   staged_count="$(wc -l < "${analysis_file}" | tr -d ' ')"
-  total_size="$(awk '{print $4}' "${analysis_file}" | while IFS= read -r indexed_path; do
-    git --git-dir="${GIT_METADATA_DIR}" cat-file -s ":${indexed_path}" 2>/dev/null || true
+  total_size="$(awk '{print $2}' "${analysis_file}" | while IFS= read -r object_id; do
+    git --git-dir="${GIT_METADATA_DIR}" cat-file -s "${object_id}" 2>/dev/null || printf '0\n'
   done | awk '{sum += $1} END {print sum + 0}')"
 
   debug_log '=== Pre-push staged content analysis ==='
@@ -373,15 +375,25 @@ log_pre_push_analysis() {
   while IFS=$'\t' read -r path_size indexed_path; do
     debug_log "staged path: ${path_size} bytes | ${indexed_path}"
   done < <(
-    awk '{print $4}' "${analysis_file}" | while IFS= read -r indexed_path; do
-      path_size="$(git --git-dir="${GIT_METADATA_DIR}" cat-file -s ":${indexed_path}" 2>/dev/null || printf '0')"
+    while IFS=$'\t' read -r metadata indexed_path; do
+      object_id="$(printf '%s' "${metadata}" | awk '{print $2}')"
+      path_size="$(git --git-dir="${GIT_METADATA_DIR}" cat-file -s "${object_id}" 2>/dev/null || printf '0')"
       printf '%s\t%s\n' "${path_size}" "${indexed_path}"
-    done | sort -rn -k1,1 | head -20
+    done < "${analysis_file}" | sort -rn -k1,1 | head -20
   )
 
   debug_log 'critical ignore checks:'
   local critical_path
-  for critical_path in     home-assistant_v2.db     home-assistant_v2.db-wal     frigate.db     deps     model_cache     www/community     zigbee2mqtt/log     zigbee2mqtt/database.db     esphome/.git; do
+  for critical_path in \
+    home-assistant_v2.db \
+    home-assistant_v2.db-wal \
+    frigate.db \
+    deps \
+    model_cache \
+    www/community \
+    zigbee2mqtt/log \
+    zigbee2mqtt/database.db \
+    esphome/.git; do
     if GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" ls-files --error-unmatch -- "${critical_path}" >/dev/null 2>&1; then
       debug_log "critical path indexed: ${critical_path}"
     elif GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.excludesfile GIT_CONFIG_VALUE_0="${GITIGNORE_FILE}" git --git-dir="${GIT_METADATA_DIR}" --work-tree="${CONFIG_DIR}" check-ignore -q -- "${critical_path}" 2>/dev/null; then
@@ -394,6 +406,7 @@ log_pre_push_analysis() {
   rm -f "${analysis_file}"
   debug_log '=== End pre-push staged content analysis ==='
 }
+
 
 sync_configuration() {
   debug_log "sync started; repository=${repository_url}; branch=${branch}; active_ignore_file=${GITIGNORE_FILE}"

@@ -2,6 +2,10 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.7.1
+
+- Fixed pre-push staged-content size analysis to calculate Git blob sizes from object IDs in the isolated index.
+
 ## 4.7.0
 
 - Added pre-push staged-content analysis to the sync debug log: staged path count, total content size, largest 20 paths, and critical ignore checks.
