@@ -51,6 +51,10 @@ in the private backup repository.
 
 > **Security warning:** This may include settings and credentials for other apps. Keep the destination repository private and review the active Git ignore rules before enabling this option.
 
+### ESPHome
+
+ESPHome configurations are backed up as normal files. The add-on preserves YAML files, archives, and user-created files, while excluding ESPHome’s internal `.git` directory, device-builder state, build artifacts, and `secrets.yaml`. This prevents GitHub from showing `esphome` as a broken embedded-repository link.
+
 ## Git ignore rules
 
 The Web UI displays the active Git ignore rules used for synchronization. To change them, edit this persistent file with File Editor or Studio Code Server:

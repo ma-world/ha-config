@@ -35,7 +35,13 @@ www/**/*.zip
 www/**/*.tar
 www/**/*.gz
 www/community/
+esphome/.git/
 esphome/.esphome/
+esphome/.device-builder-peer-link-key.bin
+esphome/.device-builder-preferences.json
+esphome/.device-builder.json
+esphome/.device-builder.json.lock
+esphome/secrets.yaml
 zigbee2mqtt/database.db*
 zigbee2mqtt/logs/
 """

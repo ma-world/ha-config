@@ -55,7 +55,13 @@ www/**/*.zip
 www/**/*.tar
 www/**/*.gz
 www/community/
+esphome/.git/
 esphome/.esphome/
+esphome/.device-builder-peer-link-key.bin
+esphome/.device-builder-preferences.json
+esphome/.device-builder.json
+esphome/.device-builder.json.lock
+esphome/secrets.yaml
 zigbee2mqtt/database.db*
 zigbee2mqtt/logs/
 
@@ -335,6 +341,40 @@ README
 }
 
 
+add_esphome_as_regular_files() {
+  local esphome_source="${CONFIG_DIR}/esphome"
+  local esphome_snapshot="${SNAPSHOT_DIR}/esphome"
+
+  if [[ ! -d "${esphome_source}" ]]; then
+    debug_log 'ESPHome snapshot: source directory not present'
+    return 0
+  fi
+
+  debug_log 'ESPHome snapshot: staging configuration files as regular files; internal Git metadata is excluded'
+  rm -rf "${esphome_snapshot}"
+  mkdir -p "${esphome_snapshot}"
+  rsync -a --delete \
+    --exclude='.git/' \
+    --exclude='.esphome/' \
+    --exclude='.device-builder-peer-link-key.bin' \
+    --exclude='.device-builder-preferences.json' \
+    --exclude='.device-builder.json' \
+    --exclude='.device-builder.json.lock' \
+    --exclude='secrets.yaml' \
+    "${esphome_source}/" "${esphome_snapshot}/"
+
+  # Remove the Gitlink from the temporary index, then add the isolated normal
+  # files under the original esphome path. /homeassistant/esphome is never
+  # changed.
+  GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" --work-tree="${SNAPSHOT_DIR}" update-index --force-remove -- esphome || true
+  GIT_INDEX_FILE="${INDEX_FILE}" \
+  GIT_CONFIG_COUNT=1 \
+  GIT_CONFIG_KEY_0=core.excludesfile \
+  GIT_CONFIG_VALUE_0="${GITIGNORE_FILE}" \
+  git --git-dir="${GIT_METADATA_DIR}" --work-tree="${SNAPSHOT_DIR}" add -f -- esphome
+  debug_log "ESPHome snapshot: staged $(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" ls-files -- esphome | wc -l | tr -d ' ') regular file path(s)"
+}
+
 rebuild_index_from_config() {
   bashio::log.info 'Rebuilding isolated Git index from the read-only /homeassistant source tree.'
   # Rebuilding only the index applies ignore changes immediately without
@@ -342,6 +382,7 @@ rebuild_index_from_config() {
   rm -f "${INDEX_FILE}"
   safe_git read-tree --empty
   safe_git add -A -- .
+  add_esphome_as_regular_files
   add_all_app_configs_to_index
   bashio::log.info "Staged $(GIT_INDEX_FILE="${INDEX_FILE}" git --git-dir="${GIT_METADATA_DIR}" diff --cached --name-only | wc -l | tr -d ' ') path(s) after applying ignore rules."
 

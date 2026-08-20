@@ -2,6 +2,12 @@
 
 All notable changes to **HA Config Sync** are documented in this file.
 
+## 4.9.0
+
+- Backs up ESPHome configurations as regular files instead of an embedded Git repository link.
+- Excludes ESPHome internal Git metadata, device-builder state, build files, and secrets while preserving YAML files, archives, and user files.
+- Uses an isolated temporary snapshot and never modifies `/homeassistant/esphome`.
+
 ## 4.8.0
 
 - Configured Git HTTPS pushes to use HTTP/1.1 for improved reliability with Home Assistant network environments.
